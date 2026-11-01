@@ -25,8 +25,8 @@ cost so a fanless MacBook Air holds 60 FPS on Medium.
    the texture with a random offset and rotation, blended by texel height). Wind ripples are drawn in
    world space, and colour varies at three scales (patches of tens of metres, iron-red and pale wash
    zones of hundreds of metres, and region-wide zones).
-7. **Contrast.** Deep, cool shadows against warm sunlit rock: low ambient fill, ACES with +22
-   contrast, and split toning (blue shadows, warm highlights). Fog starts at 30% of the view distance
+7. **Contrast.** Deep, cool shadows against warm sunlit rock: moderate ambient fill, ACES with
+   +15 contrast and +5 saturation, and gentle split toning (cool shadows, warm highlights). Fog starts at 30% of the view distance
    so mid-distance rock stays crisp.
 8. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
    ranges (2.6–3.4 km), with bluer haze the further you go.

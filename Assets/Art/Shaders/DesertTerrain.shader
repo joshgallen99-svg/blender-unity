@@ -191,7 +191,7 @@ Shader "Offroad/DesertTerrain"
                 s.albedo = albedo;
                 s.smoothness = lerp(0.06, 0.12, rb);
                 s.normalTS = half3(0, 0, 1);
-                s.occlusion = lerp(0.58, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.5));
+                s.occlusion = lerp(0.66, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.5));
                 s.alpha = 1;
 
                 InputData d = (InputData)0;
