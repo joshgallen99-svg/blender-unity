@@ -62,7 +62,7 @@ namespace Offroad.Vehicles
         [Range(0.05f, 1.5f)] public float bumpDamping = 0.35f;     // damping ratios (1 = critical)
         [Range(0.05f, 1.5f)] public float reboundDamping = 0.55f;
         [Tooltip("Anti-roll stiffness as a multiple of the spring rate.")]
-        public float antiRoll = 1.2f;
+        public float antiRoll = 0.85f;
 
         [Header("Drivetrain")]
         public float enginePower = 165000f;      // watts at the wheels

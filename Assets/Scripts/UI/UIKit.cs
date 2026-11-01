@@ -126,8 +126,8 @@ namespace Offroad.UI
         {
             var p = ctx.painter2D;
             var r = contentRect;
-            var c = new Vector2(r.width * 0.5f, r.height * 0.62f);
-            float radius = Mathf.Min(r.width * 0.46f, r.height * 0.58f);
+            var c = new Vector2(r.width * 0.5f, r.height * 0.56f);
+            float radius = Mathf.Min(r.width * 0.44f, r.height * 0.5f);
             const float a0 = 150f, a1 = 390f;
 
             p.lineWidth = 10f;

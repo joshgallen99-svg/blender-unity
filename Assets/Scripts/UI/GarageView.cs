@@ -53,7 +53,7 @@ namespace Offroad.UI
             _left.style.top = 140;
             _tabs = UIKit.Box("tabs");
             _left.Add(_tabs);
-            _cards = new ScrollView(ScrollViewMode.Vertical);
+            _cards = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             _cards.AddToClassList("cards");
             _left.Add(_cards);
             Root.Add(_left);

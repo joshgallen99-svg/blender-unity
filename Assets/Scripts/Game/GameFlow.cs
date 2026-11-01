@@ -81,7 +81,7 @@ namespace Offroad.Game
         public void GoMissions()
         {
             State = FlowState.Missions;
-            cam?.SetShowcase(true, -0.2f, 8.5f);
+            cam?.SetShowcase(true, 0.12f, 8.5f);
             ui?.ShowMissions();
         }
 
@@ -89,7 +89,7 @@ namespace Offroad.Game
         {
             State = FlowState.Garage;
             ResetVehicle();
-            cam?.SetShowcase(true, -0.22f, 7.2f);
+            cam?.SetShowcase(true, 0.3f, 7.6f);
             ui?.ShowGarage();
         }
 
@@ -159,6 +159,27 @@ namespace Offroad.Game
             SetCursor(false);
         }
 
+        int _tourIndex;
+
+        /// <summary>F9: jump to the next landmark (handy for screenshots and getting your bearings).</summary>
+        void TourNextLandmark()
+        {
+            var list = World.Landmark.All;
+            if (list.Count == 0 || !vehicle) return;
+            var l = list[_tourIndex++ % list.Count];
+            Vector3 c = l.transform.position;
+            Vector3 from = (vehicle.transform.position - c);
+            from.y = 0f;
+            if (from.sqrMagnitude < 1f) from = Vector3.back;
+            Vector3 p = c + from.normalized * Mathf.Max(28f, l.discoverRadius * 0.9f) + Vector3.up * 40f;
+            if (Physics.Raycast(p, Vector3.down, out var hit, 200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                p = hit.point + Vector3.up * 1.2f;
+            Vector3 look = c - p;
+            look.y = 0f;
+            vehicle.Teleport(p, Quaternion.LookRotation(look.normalized, Vector3.up));
+            cam?.SnapBehindTarget();
+        }
+
         void ResetVehicle()
         {
             if (vehicle) vehicle.Teleport(_spawnPos, _spawnRot);
@@ -192,6 +213,7 @@ namespace Offroad.Game
             }
             if (GameInput.GaragePressed && (State == FlowState.Title || State == FlowState.Missions)) GoGarage();
             if (GameInput.FpsTogglePressed) GameSettings.Modify(s => s.showFps = !s.showFps);
+            if (GameInput.TourPressed && State == FlowState.Driving) TourNextLandmark();
             PlayerVehicleController.InputBlocked = State != FlowState.Driving || (runner && runner.Swapping);
             if (cam) cam.InputEnabled = State == FlowState.Driving;
             if (State == FlowState.Driving && Cursor.lockState != CursorLockMode.Locked && GameInput.AnyPressed) SetCursor(true);

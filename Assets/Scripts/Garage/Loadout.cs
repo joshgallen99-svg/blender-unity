@@ -18,12 +18,12 @@ namespace Offroad.Garage
 
         public string body = "ridgeback";
         public string tire = "at";
-        public string spare = "at";
+        public string spare = "dune";
         public int engineLevel;
         public int suspensionLevel;
         public int paint;
         public List<string> ownedBodies = new List<string> { "ridgeback" };
-        public List<string> ownedTires = new List<string> { "at" };
+        public List<string> ownedTires = new List<string> { "at", "dune" };
         public List<string> ownedAccessories = new List<string> { "RoofRack" };
         public List<string> fittedAccessories = new List<string> { "RoofRack" };
         public List<Level> tireLevels = new List<Level>();

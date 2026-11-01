@@ -23,6 +23,7 @@ namespace Offroad.Core
         public static bool AnyPressed { get; private set; }
         public static bool ConfirmPressed { get; private set; }
         public static bool GaragePressed { get; private set; }
+        public static bool TourPressed { get; private set; }
         public static bool UsingGamepad { get; private set; }
 
         static int _lastFrame = -1;
@@ -37,7 +38,7 @@ namespace Offroad.Core
             _lastFrame = Time.frameCount;
 
             float throttle = 0, brake = 0, steer = 0;
-            bool handbrake = false, reset = false, menu = false, fps = false, swap = false, any = false, confirm = false, garage = false;
+            bool handbrake = false, reset = false, menu = false, fps = false, swap = false, any = false, confirm = false, garage = false, tour = false;
             Vector2 look = Vector2.zero;
             bool pad = false;
 
@@ -57,6 +58,7 @@ namespace Offroad.Core
                 any = kb.anyKey.wasPressedThisFrame;
                 confirm = kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
                 garage = kb.gKey.wasPressedThisFrame;
+                tour = kb.f9Key.wasPressedThisFrame;
             }
             var mouse = Mouse.current;
             if (mouse != null) look = mouse.delta.ReadValue() * 0.1f;
@@ -93,6 +95,7 @@ namespace Offroad.Core
             any = Input.anyKeyDown;
             confirm = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
             garage = Input.GetKeyDown(KeyCode.G);
+            tour = Input.GetKeyDown(KeyCode.F9);
             if (_mouseAxesOk)
             {
                 try { look = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")); }
@@ -111,6 +114,7 @@ namespace Offroad.Core
             AnyPressed = any;
             ConfirmPressed = confirm;
             GaragePressed = garage;
+            TourPressed = tour;
             UsingGamepad = pad || (UsingGamepad && look == Vector2.zero && throttle == 0 && steer == 0);
         }
     }

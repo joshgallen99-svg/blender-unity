@@ -23,6 +23,7 @@ Heavy work runs in the cloud: models are generated with Blender's Python module,
 | Pause, settings and graphics presets | Esc or P | Start |
 | Menus: continue / open garage | Enter / G | A / Select |
 | FPS counter | F1 | |
+| Jump to the next landmark (sightseeing / screenshots) | F9 | |
 
 ## How it plays
 

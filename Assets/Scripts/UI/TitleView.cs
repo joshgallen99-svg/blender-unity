@@ -113,7 +113,7 @@ namespace Offroad.UI
             var left = UIKit.Box("missions");
             left.Add(UIKit.SubHeading("Choose your route", "kicker"));
             left.Add(UIKit.Heading("Expeditions", "h1"));
-            _list = new ScrollView(ScrollViewMode.Vertical);
+            _list = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             _list.style.flexGrow = 1;
             _list.style.marginTop = 14;
             left.Add(_list);

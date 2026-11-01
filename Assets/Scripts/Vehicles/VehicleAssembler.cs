@@ -142,7 +142,7 @@ namespace Offroad.Vehicles
             v.maxTractiveForce = BaseTraction * massRatio * (1f + 0.08f * l.engineLevel);
             v.topSpeed = 34f + 1.2f * l.engineLevel;
             v.suspensionTravel = 0.32f + 0.03f * l.suspensionLevel;
-            v.antiRoll = 1.2f + 0.15f * l.suspensionLevel;
+            v.antiRoll = 0.85f + 0.15f * l.suspensionLevel;
             v.maxSteerAngle = body.steerAngle;
         }
 
