@@ -21,19 +21,30 @@ cost so a fanless MacBook Air holds 60 FPS on Medium.
    settles on ledges.
 5. **Height-based blending.** Ground layers blend by their height maps: sand fills the cracks of mud
    plates and between pavement stones. Slopes over ~40° and masked areas turn to layered sandstone.
-6. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
+6. **Nothing visibly tiles.** Ground textures are hex-tiled (Mikkelsen 2022: every hexagon samples
+   the texture with a random offset and rotation, blended by texel height). Wind ripples are drawn in
+   world space, and colour varies at three scales (patches of tens of metres, iron-red and pale wash
+   zones of hundreds of metres, and region-wide zones).
+7. **Contrast.** Deep, cool shadows against warm sunlit rock: low ambient fill, ACES with +22
+   contrast, and split toning (blue shadows, warm highlights). Fog starts at 30% of the view distance
+   so mid-distance rock stays crisp.
+8. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
    ranges (2.6–3.4 km), with bluer haze the further you go.
 
 ## Palette (linear)
 
-| Band | Colour |
-|---|---|
-| Deep red | 0.30, 0.05, 0.02 |
-| Rust | 0.50, 0.11, 0.035 |
-| Orange | 0.68, 0.24, 0.09 |
-| Salmon | 0.74, 0.38, 0.19 |
-| Cream | 0.80, 0.59, 0.36 |
-| Pale | 0.85, 0.70, 0.56 |
+| Band | Colour | Share of beds |
+|---|---|---|
+| Deep red | 0.26, 0.04, 0.018 | 24% |
+| Rust | 0.48, 0.10, 0.032 | 31% |
+| Orange | 0.68, 0.24, 0.085 | 24% |
+| Salmon | 0.76, 0.40, 0.20 | 12% |
+| Cream | 0.82, 0.62, 0.40 | 6.5% |
+| Pale | 0.88, 0.76, 0.62 | 2.5% |
+
+Bed thickness is irregular (a monotonic warp of the band coordinate), with occasional thin iron or
+bleached seams. In some zones the rock above ~65–95 m is bleached to cream and pale, like Valley of
+Fire's White Domes.
 
 Ground: pinkish-orange sand, buff cracked mud with dark cracks, desert pavement in varnished red-brown
 stones. Vegetation: straw and sage-green bunch grass, dusty sage shrubs, the occasional flowering
@@ -52,6 +63,14 @@ brittlebush. Sky: deep blue overhead, pale blue haze at the horizon.
 |---|---|
 | Formations | `blender/formations/sandstone_formations.py` |
 | Region layout, masks, scatter | `tools/terrain/generate_desert.py` |
-| Ground and rock textures | `tools/art/generate_terrain_textures.py` |
+| Ground and rock textures | `tools/art/generate_terrain_textures.py` (sand grain from a CC0 scan, see below) |
 | Foliage sprites | `tools/art/generate_foliage_textures.py` |
 | Composition preview (Blender) | `blender/preview/render_scene.py` |
+
+## Third-party sources
+
+Only used where they fit the palette and shapes exactly; everything else is made here.
+
+| Asset | Source | Licence | Used for |
+|---|---|---|---|
+| Ground054 (sand scan) | [ambientCG](https://ambientcg.com/view?id=Ground054) | CC0 1.0 | Sand grain and surface relief, high-passed and re-coloured to our palette (`tools/art/sources/ambientcg/`) |

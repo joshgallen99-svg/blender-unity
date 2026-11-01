@@ -134,7 +134,7 @@ namespace Offroad.Settings
                 default: QualitySettings.vSyncCount = 1; Application.targetFrameRate = -1; break;
             }
 
-            RenderSettings.fogStartDistance = s.viewDistance * 0.22f;
+            RenderSettings.fogStartDistance = s.viewDistance * 0.3f;   // keep mid-distance rock crisp
             RenderSettings.fogEndDistance = s.viewDistance * 0.97f;
 
             foreach (var cam in Camera.allCameras) ApplyToCamera(cam, s);

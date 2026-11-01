@@ -16,13 +16,14 @@ Shader "Offroad/DesertTerrain"
         [Normal] _PaveNrm ("Pavement Normal", 2D) = "bump" {}
         _RockTex ("Sandstone", 2D) = "white" {}
         [Normal] _RockNrm ("Sandstone Normal", 2D) = "bump" {}
-        _SandScale ("Sand Tile (m)", Float) = 6
+        _SandScale ("Sand Tile (m)", Float) = 3.5
         _MudScale ("Mud Tile (m)", Float) = 4.5
         _PaveScale ("Pavement Tile (m)", Float) = 3
         _RockScale ("Rock Tile (m)", Float) = 9
         _BlendDepth ("Height Blend Depth", Range(0.02, 1)) = 0.18
         _RockSlope ("Rock Slope Start/End (1 - n.y)", Vector) = (0.24, 0.42, 0, 0)
         _NormalStrength ("Normal Strength", Range(0, 2)) = 1
+        _RippleStrength ("Wind Ripples", Range(0, 1)) = 1
     }
 
     SubShader
@@ -38,6 +39,7 @@ Shader "Offroad/DesertTerrain"
             half _BlendDepth;
             float4 _RockSlope;
             half _NormalStrength;
+            half _RippleStrength;
         CBUFFER_END
         ENDHLSL
 
@@ -101,19 +103,42 @@ Shader "Offroad/DesertTerrain"
                 half4 mask = SAMPLE_TEXTURE2D(_Mask, sampler_Mask, i.uvFog.xy);
                 half4 macro = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 256.0);
                 half4 macro2 = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 37.0 + 0.37);
-
-                // --- Ground layers (top-down projection). Sand is sampled at two scales to hide tiling.
-                float2 uvSand = p.xz / _SandScale;
-                half4 sandA = SAMPLE_TEXTURE2D(_SandTex, sampler_SandTex, uvSand);
-                half4 sandB = SAMPLE_TEXTURE2D(_SandTex, sampler_SandTex, uvSand * 0.27 + 0.5);
-                half4 sand = lerp(sandA, sandB, 0.35 + 0.3 * macro.g);
-                half3 sandN = UnpackNormalScale(SAMPLE_TEXTURE2D(_SandNrm, sampler_SandNrm, uvSand), _NormalStrength);
-                half4 mud = SAMPLE_TEXTURE2D(_MudTex, sampler_MudTex, p.xz / _MudScale);
-                half3 mudN = UnpackNormalScale(SAMPLE_TEXTURE2D(_MudNrm, sampler_MudNrm, p.xz / _MudScale), _NormalStrength);
-                half4 pave = SAMPLE_TEXTURE2D(_PaveTex, sampler_PaveTex, p.xz / _PaveScale);
-                half3 paveN = UnpackNormalScale(SAMPLE_TEXTURE2D(_PaveNrm, sampler_PaveNrm, p.xz / _PaveScale), _NormalStrength);
-
+                half4 macroL = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 1400.0 + 0.71);   // region-scale zones
+                half4 macroS = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 9.0 + 0.13);      // ripple warp
+                float2 dpx = ddx(p.xz);
+                float2 dpy = ddy(p.xz);
                 half3 w = max(mask.rgb, 0.0001);
+
+                // --- Ground layers (top-down, hex-tiled so they never visibly repeat). Layers the mask
+                // doesn't use here are skipped (the branch is coherent: the mask changes slowly).
+                half4 sand = half4(0.6, 0.4, 0.3, 0.5);
+                half3 sandN = half3(0, 0, 1);
+                [branch] if (w.x + mask.a > 0.004)   // sand also pools in slickrock hollows
+                {
+                    HexTiles hs = HexSetup(p.xz / _SandScale, dpx / _SandScale, dpy / _SandScale, 1.0);
+                    half3 hw;
+                    sand = HexSample(TEXTURE2D_ARGS(_SandTex, sampler_SandTex), hs, 0.6, hw);
+                    sandN = HexNormal(TEXTURE2D_ARGS(_SandNrm, sampler_SandNrm), hs, hw, _NormalStrength);
+                }
+                half4 mud = half4(0.6, 0.5, 0.4, 0.5);
+                half3 mudN = half3(0, 0, 1);
+                [branch] if (w.y > 0.004)
+                {
+                    HexTiles hm = HexSetup(p.xz / _MudScale + 0.31, dpx / _MudScale, dpy / _MudScale, 1.0);
+                    half3 hw;
+                    mud = HexSample(TEXTURE2D_ARGS(_MudTex, sampler_MudTex), hm, 0.5, hw);
+                    mudN = HexNormal(TEXTURE2D_ARGS(_MudNrm, sampler_MudNrm), hm, hw, _NormalStrength);
+                }
+                half4 pave = half4(0.5, 0.35, 0.25, 0.5);
+                half3 paveN = half3(0, 0, 1);
+                [branch] if (w.z > 0.004)
+                {
+                    HexTiles hp = HexSetup(p.xz / _PaveScale + 0.67, dpx / _PaveScale, dpy / _PaveScale, 1.0);
+                    half3 hw;
+                    pave = HexSample(TEXTURE2D_ARGS(_PaveTex, sampler_PaveTex), hp, 0.7, hw);
+                    paveN = HexNormal(TEXTURE2D_ARGS(_PaveNrm, sampler_PaveNrm), hp, hw, _NormalStrength);
+                }
+
                 // Break up mask edges with the textures' own heights (sand fills the cracks).
                 half3 hb = w + half3(sand.a * 0.5, mud.a, pave.a) * _BlendDepth * 2.0 + (macro2.b - 0.5) * 0.15;
                 half mx = max(hb.x, max(hb.y, hb.z));
@@ -122,16 +147,30 @@ Shader "Offroad/DesertTerrain"
                 half3 groundCol = sand.rgb * bw.x + mud.rgb * bw.y + pave.rgb * bw.z;
                 half groundH = sand.a * 0.5 * bw.x + mud.a * bw.y + pave.a * bw.z;
                 half3 groundTN = sandN * bw.x + mudN * bw.y + paveN * bw.z;
+
+                // Wind ripples on open, flat sand (patchy, drawn in world space).
+                half rippleAmt = bw.x * smoothstep(0.35, 0.62, macro2.g) * saturate(n.y * 5.0 - 4.0) * _RippleStrength;
+                half2 rippleN;
+                half ripple = SandRipples(p.xz, macroS.r + macro2.b * 0.5, rippleAmt, rippleN);
+                groundTN.xy += rippleN;
+                groundCol *= 1.0 + 0.08 * (ripple - 0.5 * rippleAmt);
                 half3 groundNormal = TopNormal(groundTN, n);
 
                 // --- Sandstone: steep slopes, or slickrock exposed by the mask. Triplanar + strata colour.
                 half steep = 1.0 - n.y;
                 half rockW = saturate(max(mask.a, smoothstep(_RockSlope.x, _RockSlope.y, steep)));
+                half4 rockTex = half4(0.66, 0.66, 0.66, 0.5);
+                half3 rockNormal = n;
                 float3 pr = p / _RockScale;
-                half3 tw = TriplanarWeights(n, 4);
-                half4 rockTex = TriplanarSample(TEXTURE2D_ARGS(_RockTex, sampler_RockTex), pr, tw);
-                half3 rockNormal = TriplanarNormal(TEXTURE2D_ARGS(_RockNrm, sampler_RockNrm), pr, n, tw, _NormalStrength);
-                half3 strata = StrataColor(p, macro.g * 0.7 + macro2.r * 0.3);
+                float3 prdx = ddx(pr);
+                float3 prdy = ddy(pr);
+                [branch] if (rockW > 0.002)
+                {
+                    half3 tw = TriplanarWeights(n, 4);
+                    rockTex = TriplanarSampleGrad(TEXTURE2D_ARGS(_RockTex, sampler_RockTex), pr, prdx, prdy, tw);
+                    rockNormal = TriplanarNormalGrad(TEXTURE2D_ARGS(_RockNrm, sampler_RockNrm), pr, prdx, prdy, n, tw, _NormalStrength);
+                }
+                half3 strata = StrataColor(p, macro.g * 0.7 + macro2.r * 0.3, macroL.r);
                 half3 rockCol = rockTex.rgb * strata * 1.55;
 
                 // Height blend ground vs rock: sand pools in the hollows of slickrock.
@@ -141,15 +180,18 @@ Shader "Offroad/DesertTerrain"
                 half3 albedo = lerp(groundCol, rockCol, rb);
                 half3 normalWS = normalize(lerp(groundNormal, rockNormal, rb));
 
-                // Macro colour variation (large patches lighter/darker, a little redder in places).
-                albedo *= lerp(0.86, 1.1, macro.r);
-                albedo = lerp(albedo, albedo * half3(1.08, 0.95, 0.9), macro.b * 0.45);
+                // Macro colour variation at three scales: light/dark patches, iron-red sand in some
+                // areas and paler, greyer wash deposits in others.
+                albedo *= lerp(0.80, 1.12, macro.r) * lerp(0.93, 1.05, macro2.g);
+                half ground = 1.0 - rb;
+                albedo = lerp(albedo, albedo * half3(1.12, 0.90, 0.82), smoothstep(0.45, 0.8, macroL.b) * 0.65 * ground);
+                albedo = lerp(albedo, albedo * half3(1.0, 1.03, 1.08), smoothstep(0.55, 0.85, macro.b) * 0.5 * ground);
 
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = albedo;
                 s.smoothness = lerp(0.06, 0.12, rb);
                 s.normalTS = half3(0, 0, 1);
-                s.occlusion = lerp(0.72, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.4));
+                s.occlusion = lerp(0.58, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.5));
                 s.alpha = 1;
 
                 InputData d = (InputData)0;

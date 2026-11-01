@@ -44,6 +44,9 @@ const server = http.createServer((req, res) => {
   page.on('console', m => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', e => logs.push(`[pageerror] ${e.message}`));
   await page.goto('http://localhost:8123/');
+  // Software rendering is slow: shrink the canvas (Unity matches its back buffer to the CSS size).
+  const canvasW = Number(process.env.CANVAS_W || 640), canvasH = Number(process.env.CANVAS_H || 400);
+  await page.addStyleTag({ content: `#unity-canvas { width: ${canvasW}px !important; height: ${canvasH}px !important; }` }).catch(() => {});
   // Measure the page's frame rate (software rendering here, so only useful as a relative number).
   await page.evaluate(() => {
     window.__fps = [];
@@ -61,7 +64,7 @@ const server = http.createServer((req, res) => {
     else if (cmd === 'down') await page.keyboard.down(a);
     else if (cmd === 'up') await page.keyboard.up(a);
     else if (cmd === 'press') await page.keyboard.press(a);
-    else if (cmd === 'shot') await page.screenshot({ path: path.join(outDir, `${a}.png`) });
+    else if (cmd === 'shot') await page.screenshot({ path: path.join(outDir, `${a}.png`), timeout: 240000 }).catch(e => console.warn('shot failed', a, e.message));
     else if (cmd === 'mouse') { await page.mouse.move(640, 360); await page.mouse.move(640 + Number(a), 360 + Number(b), { steps: 10 }); }
     else console.warn('Unknown step', step);
   }

@@ -100,7 +100,7 @@ namespace Offroad.EditorTools
             m.SetColor("_BaseColor", tint);
             m.SetColor("_TopColor", Color.white);
             m.SetFloat("_Scale", 9f);
-            m.SetFloat("_TopScale", 6f);
+            m.SetFloat("_TopScale", 3.5f);
             m.SetFloat("_TopAmount", sandOnLedges);
             m.SetFloat("_SkirtHeight", 1.2f);
             m.enableInstancing = true;
@@ -122,6 +122,11 @@ namespace Offroad.EditorTools
             m.SetTexture("_PaveNrm", Tex("Pavement_normal"));
             m.SetTexture("_RockTex", Tex("Sandstone_albedo"));
             m.SetTexture("_RockNrm", Tex("Sandstone_normal"));
+            m.SetFloat("_SandScale", 3.5f);     // photo-scanned sand detail, hex-tiled
+            m.SetFloat("_MudScale", 4.5f);
+            m.SetFloat("_PaveScale", 3f);
+            m.SetFloat("_RockScale", 9f);
+            m.SetFloat("_RippleStrength", 1f);
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -232,8 +237,8 @@ namespace Offroad.EditorTools
             m.SetFloat("_SunDisk", 2f);               // high quality
             m.SetFloat("_SunSize", 0.035f);
             m.SetFloat("_SunSizeConvergence", 6f);
-            m.SetFloat("_AtmosphereThickness", 0.95f);
-            m.SetColor("_SkyTint", new Color(0.44f, 0.52f, 0.68f));
+            m.SetFloat("_AtmosphereThickness", 0.85f);   // deeper blue overhead
+            m.SetColor("_SkyTint", new Color(0.40f, 0.50f, 0.70f));
             m.SetColor("_GroundColor", new Color(0.62f, 0.50f, 0.44f));
             m.SetFloat("_Exposure", 1.25f);
             EditorUtility.SetDirty(m);

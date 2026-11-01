@@ -14,13 +14,16 @@ namespace Offroad.World
     public class Atmosphere : MonoBehaviour
     {
         [Header("Grading")]
-        public float postExposure = 0.05f;
-        public float contrast = 10f;
-        public float saturation = 2f;
+        public float postExposure = 0.1f;
+        public float contrast = 22f;
+        public float saturation = 8f;
         public float temperature = 2f;
         public float bloomIntensity = 0.55f;
         public float bloomThreshold = 1.05f;
-        public float vignette = 0.22f;
+        public float vignette = 0.24f;
+        [Tooltip("Cool shadows / warm highlights: complementary contrast that makes the red rock pop.")]
+        public Color splitShadows = new Color(0.44f, 0.50f, 0.60f);
+        public Color splitHighlights = new Color(0.58f, 0.50f, 0.42f);
 
         [Header("Reflections")]
         public int reflectionResolution = 128;
@@ -61,6 +64,11 @@ namespace Offroad.World
             var wb = profile.Add<WhiteBalance>(true);
             wb.temperature.Override(temperature);
             wb.tint.Override(0f);
+
+            var split = profile.Add<SplitToning>(true);
+            split.shadows.Override(splitShadows);
+            split.highlights.Override(splitHighlights);
+            split.balance.Override(-15f);
 
             var bloom = profile.Add<Bloom>(true);
             bloom.intensity.Override(bloomIntensity);

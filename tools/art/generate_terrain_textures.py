@@ -87,19 +87,41 @@ def save(name, albedo, height, strength):
 
 yy, xx = np.mgrid[0:T, 0:T] / T
 
-# ---------------------------------------------------------------- Sand (tile = 6 m)
-warp = band_noise(2, 6, 1)
-ripples = 0.5 + 0.5 * np.sin(2 * math.pi * (yy * 22 + xx * 5 + warp * 3.5))
-ripples = ripples ** 1.6 * band_noise(1, 3, 2)                      # ripples come and go
-grain = tile_noise(0.4, 3)
-fine = band_noise(60, 300, 4)
-f1, edge, cid = voronoi(260, 5)
-pebble = smoothstep(4.5, 1.0, f1) * (np.random.default_rng(6).random(cid.max() + 1)[cid] > 0.86)
-tone = band_noise(1, 5, 7)
-alb = mix((0.71, 0.46, 0.32), (0.86, 0.62, 0.45), 0.55 * tone + 0.25 * ripples + 0.2 * fine)
-alb *= (0.93 + 0.12 * grain)[..., None]
-alb = alb * (1 - pebble[..., None] * 0.55) + np.array([0.36, 0.24, 0.18]) * pebble[..., None] * 0.55
-save("Sand", alb, ripples * 0.45 + fine * 0.2 + pebble * 0.6, 3.0)
+# ---------------------------------------------------------------- Sand (tile = 3.5 m)
+# Photo-scanned sand (ambientCG Ground054, CC0) used for its grain and surface relief only: the
+# luminance detail is high-passed (so no large blotches repeat) and re-coloured to our palette.
+# Wind ripples are not baked in: the terrain shader draws them in world space so they never tile.
+SRC = os.path.join(REPO, "tools", "art", "sources", "ambientcg", "Ground054")
+
+
+def load(name, mode="RGB"):
+    im = Image.open(os.path.join(SRC, name)).convert(mode)
+    return np.asarray(im.resize((T, T), Image.LANCZOS)).astype(np.float64) / 255
+
+
+def wrap_blur(a, sigma):
+    return ndimage.gaussian_filter(a, sigma, mode="wrap")
+
+
+photo = load("Ground054_1K_Color.jpg")
+lum = photo @ np.array([0.2126, 0.7152, 0.0722])
+detail = lum / np.maximum(wrap_blur(lum, 48), 1e-3)                    # ~1.0 on average, grain detail only
+detail = 1 + (detail - 1) * 1.35
+chroma = photo / np.maximum(lum[..., None], 1e-3)                      # keep the hue of individual grains a little
+chroma = chroma / chroma.reshape(-1, 3).mean(0)
+tone = band_noise(2, 8, 7)                                             # gentle in-tile variation only
+alb = mix((0.76, 0.50, 0.35), (0.84, 0.58, 0.41), tone)
+alb = alb * detail[..., None] * (1 + (chroma - 1) * 0.35)
+disp = load("Ground054_1K_Displacement.jpg", "L")
+disp = disp - wrap_blur(disp, 96) * 0.6                                # flatten the largest lumps (trampled look)
+h = (disp - disp.min()) / np.ptp(disp)
+rgba = np.concatenate([np.clip(alb, 0, 1), h[..., None]], -1)
+Image.fromarray((rgba * 255).round().astype(np.uint8), "RGBA").save(os.path.join(OUT, "Sand_albedo.png"))
+nrm = load("Ground054_1K_NormalGL.jpg") * 2 - 1                        # OpenGL convention = Unity's
+nrm[..., :2] *= 0.75
+nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+Image.fromarray(((nrm * 0.5 + 0.5) * 255).round().astype(np.uint8), "RGB").save(os.path.join(OUT, "Sand_normal.png"))
+print("wrote Sand (photo detail)")
 
 # ---------------------------------------------------------------- Cracked mud (tile = 4 m)
 f1, edge, cid = voronoi(70, 11, jitter=0.9)

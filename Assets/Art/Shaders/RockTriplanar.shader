@@ -111,9 +111,10 @@ Shader "Offroad/RockTriplanar"
 
                 half4 macro = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 256.0);
                 half4 macro2 = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 37.0 + 0.37);
-                half3 strata = StrataColor(p, macro.g * 0.7 + macro2.r * 0.3);
+                half4 macroL = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 1400.0 + 0.71);
+                half3 strata = StrataColor(p, macro.g * 0.7 + macro2.r * 0.3, macroL.r);
                 half3 rock = rockTex.rgb * strata * 1.55 * _BaseColor.rgb;
-                rock *= lerp(0.88, 1.08, macro.r);
+                rock *= lerp(0.84, 1.1, macro.r);
 
                 // Sand: on upward-facing ledges, and as a skirt where the rock meets the terrain.
                 float2 uvTop = p.xz / _TopScale;

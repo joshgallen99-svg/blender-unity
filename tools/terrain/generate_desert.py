@@ -145,7 +145,8 @@ def road_point(t, side=0.0):
 
 # ---------------------------------------------------------------------------- formations (placed first, terrain adapts)
 # name: (rx, rz) footprint half-extents in metres at scale 1, along the model's local x and z
-FOOT = {"Mound_0": (23, 19), "Mound_1": (15, 13), "Mound_2": (28, 19), "Fin_0": (35, 8), "Fin_1": (23, 8),
+FOOT = {"Mound_0": (23, 19), "Mound_1": (15, 13), "Mound_2": (28, 19), "Mound_3": (18, 13), "Mound_4": (31, 19),
+        "Fin_0": (35, 8), "Fin_1": (23, 8), "Fin_2": (29, 10), "Spire_2": (8, 8),
         "Butte_0": (50, 40), "Spire_0": (7, 7), "Spire_1": (5, 5), "Ledge_0": (8, 6), "Ledge_1": (6, 4),
         "Ledge_2": (11, 5), "Arch_0": (21, 6)}
 
@@ -162,7 +163,8 @@ def beside_road(model, t, side, yaw_off, scale, sink=2.5):
     add_formation(model, x, z, heading + yaw_off, scale, sink)
 
 
-def massif(t, side, length, count, scale_rng, seed, models=("Mound_0", "Mound_2", "Fin_0", "Mound_1", "Fin_1")):
+def massif(t, side, length, count, scale_rng, seed,
+           models=("Mound_0", "Mound_2", "Fin_0", "Mound_1", "Fin_1", "Mound_3", "Mound_4", "Fin_2")):
     """A long rock mass built from overlapping formations, running roughly parallel to the road."""
     r = np.random.default_rng(seed)
     cx, cz, heading = road_point(t, side)
@@ -192,7 +194,7 @@ beside_road("Mound_0", 0.255, 58, 30, 1.7, 3.0)          # gateway pair framing 
 beside_road("Fin_1", 0.275, -62, 80, 2.0, 3.0)
 beside_road("Mound_1", 0.15, 55, 200, 1.6, 3.0)
 beside_road("Mound_2", 0.45, -66, 200, 1.7, 3.0)
-beside_road("Spire_0", 0.49, 50, 0, 1.4, 2.5)
+beside_road("Spire_2", 0.49, 50, 0, 1.3, 2.5)
 beside_road("Mound_1", 0.66, 62, 110, 2.1, 3.0)
 beside_road("Fin_1", 0.71, -58, 95, 1.8, 3.0)
 beside_road("Spire_1", 0.38, 46, 0, 1.3, 2.5)
@@ -215,7 +217,7 @@ for m, a, rad, s in (("Spire_0", 110, 1.05, 1.5), ("Spire_1", 70, 1.1, 1.4), ("S
 # The Chimneys: spires and a mound among the hoodoos.
 add_formation("Mound_1", 130, 140, 30, 1.8, 3.0)
 add_formation("Mound_2", 90, 260, 70, 1.6, 3.0)
-add_formation("Spire_0", 270, 260, 0, 1.1)
+add_formation("Spire_2", 270, 260, 0, 1.0)
 add_formation("Spire_1", 165, 290, 40, 1.2)
 add_formation("Spire_1", 255, 150, 110, 1.0)
 
