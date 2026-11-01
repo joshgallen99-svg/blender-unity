@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 namespace Offroad.Settings
 {
     public enum QualityPreset { BatterySaver, Low, Medium, High, Custom }
-    public enum ShadowSetting { Off, Low, High }
+    public enum ShadowSetting { Off, Low, Medium, High }
     public enum AntiAliasingSetting { Off, FXAA, SMAA }
     public enum FrameCap { Fps30, Fps60, Unlimited }
 
@@ -32,7 +32,7 @@ namespace Offroad.Settings
     /// </summary>
     public static class GameSettings
     {
-        const string Key = "offroad.settings.v1";
+        const string Key = "offroad.settings.v2";   // v2: Medium got soft shadows + SMAA
 
         public static SettingsData Current { get; private set; } = Load();
         public static event Action<SettingsData> Changed;
@@ -81,7 +81,7 @@ namespace Offroad.Settings
                     return new SettingsData { preset = p, renderScale = 1f, shadows = ShadowSetting.High, viewDistance = 1100f,
                         detail = 1.6f, postEffects = true, antiAliasing = AntiAliasingSetting.SMAA, frameCap = FrameCap.Fps60 };
                 default:
-                    return new SettingsData { preset = QualityPreset.Medium };
+                    return new SettingsData { preset = QualityPreset.Medium, shadows = ShadowSetting.Medium, antiAliasing = AntiAliasingSetting.SMAA };
             }
         }
 
@@ -154,10 +154,12 @@ namespace Offroad.Settings
                 _runtimeAsset.fsrOverrideSharpness = true;
                 _runtimeAsset.fsrSharpness = 0.82f;
                 _lastScreenHeight = Screen.height;
-                _runtimeAsset.shadowDistance = s.shadows == ShadowSetting.Off ? 0f
-                    : s.shadows == ShadowSetting.Low ? 70f : 160f;
+                _runtimeAsset.shadowDistance = s.shadows switch
+                {
+                    ShadowSetting.Off => 0f, ShadowSetting.Low => 70f, ShadowSetting.Medium => 85f, _ => 160f,
+                };
                 _runtimeAsset.shadowCascadeCount = s.shadows == ShadowSetting.High ? 4 : 2;
-                _runtimeAsset.mainLightShadowmapResolution = s.shadows == ShadowSetting.High ? 2048 : 1024;
+                _runtimeAsset.mainLightShadowmapResolution = s.shadows >= ShadowSetting.Medium ? 2048 : 1024;
                 _runtimeAsset.msaaSampleCount = 1;
             }
 
@@ -187,7 +189,7 @@ namespace Offroad.Settings
             foreach (var light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
                 if (light.type == LightType.Directional)
                     light.shadows = s.shadows == ShadowSetting.Off ? LightShadows.None
-                        : s.shadows == ShadowSetting.Low ? LightShadows.Hard : LightShadows.Soft;
+                        : s.shadows == ShadowSetting.Low ? LightShadows.Hard : LightShadows.Soft;   // soft from Medium up
 
             foreach (var t in Terrain.activeTerrains)
             {

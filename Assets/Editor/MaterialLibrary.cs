@@ -201,6 +201,18 @@ namespace Offroad.EditorTools
             return m;
         }
 
+        public static Material Sky(string name, Color zenith, Color horizon, Color haze, Color ground, Color glow)
+        {
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Sky");
+            m.SetColor("_ZenithColor", zenith);
+            m.SetColor("_HorizonColor", horizon);
+            m.SetColor("_HazeColor", haze);
+            m.SetColor("_GroundColor", ground);
+            m.SetColor("_SunGlowColor", glow);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         public static Material Clouds(string name, float coverage, Color horizon)
         {
             var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Clouds");

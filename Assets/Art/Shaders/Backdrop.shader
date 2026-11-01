@@ -28,6 +28,7 @@ Shader "Offroad/Backdrop"
             #pragma fragment Frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+            float4 _OffroadSunFogColor;
             CBUFFER_START(UnityPerMaterial)
                 half4 _LitColor, _ShadowColor, _HazeColor;
                 half _Haze;
@@ -41,6 +42,7 @@ Shader "Offroad/Backdrop"
                 float4 positionCS : SV_POSITION;
                 float3 normalWS : TEXCOORD0;
                 float height : TEXCOORD1;
+                float3 positionWS : TEXCOORD2;
                 half4 color : COLOR;
             };
 
@@ -56,6 +58,7 @@ Shader "Offroad/Backdrop"
             #endif
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.height = positionWS.y;
+                o.positionWS = positionWS;
                 o.color = v.color;
                 return o;
             }
@@ -71,7 +74,11 @@ Shader "Offroad/Backdrop"
                 col = lerp(col, lerp(half3(0.50, 0.58, 0.72), half3(0.94, 0.95, 0.98), ndl), snow);
                 // Thicker haze near the base of the ranges, clearer toward the peaks.
                 half haze = saturate(_Haze * (1.15 - saturate(i.height / _HazeHeight) * 0.5));
-                return half4(lerp(col, _HazeColor.rgb, haze), 1);
+                // Haze glows warm on the sun's side of the horizon, like the sky behind it.
+                float3 v = normalize(i.positionWS - _WorldSpaceCameraPos);
+                half sunward = pow(saturate(dot(v, sun.direction)), 5.0) * _OffroadSunFogColor.a;
+                half3 hazeCol = lerp(_HazeColor.rgb, _OffroadSunFogColor.rgb, sunward);
+                return half4(lerp(col, hazeCol, haze), 1);
             }
             ENDHLSL
         }

@@ -251,7 +251,7 @@ Shader "Offroad/DesertTerrain"
                 d.shadowMask = half4(1, 1, 1, 1);
 
                 half4 color = UniversalFragmentPBR(d, s);
-                color.rgb = MixFog(color.rgb, d.fogCoord);
+                color.rgb = OffroadFog(color.rgb, i.positionWS, d.fogCoord);
                 return half4(color.rgb, 1);
             }
             ENDHLSL

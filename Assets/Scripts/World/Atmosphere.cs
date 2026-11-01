@@ -18,12 +18,17 @@ namespace Offroad.World
         public float contrast = 15f;
         public float saturation = 5f;
         public float temperature = 2f;
-        public float bloomIntensity = 0.55f;
-        public float bloomThreshold = 1.05f;
+        public float bloomIntensity = 0.65f;
+        public float bloomThreshold = 0.95f;
         public float vignette = 0.2f;
         [Tooltip("Cool shadows / warm highlights: complementary contrast that makes the red rock pop.")]
         public Color splitShadows = new Color(0.47f, 0.50f, 0.55f);
         public Color splitHighlights = new Color(0.54f, 0.50f, 0.46f);
+
+        [Header("Aerial perspective")]
+        [Tooltip("Colour the distance haze takes on when looking toward the sun (matches the sky's sun glow).")]
+        public Color sunFogColor = new Color(1f, 0.74f, 0.5f);
+        [Range(0, 1)] public float sunFogStrength = 0.7f;
 
         [Header("Reflections")]
         public int reflectionResolution = 128;
@@ -31,8 +36,11 @@ namespace Offroad.World
         Volume _volume;
         ReflectionProbe _probe;
 
+        static readonly int SunFogId = Shader.PropertyToID("_OffroadSunFogColor");
+
         void Awake()
         {
+            Shader.SetGlobalVector(SunFogId, new Vector4(sunFogColor.r, sunFogColor.g, sunFogColor.b, sunFogStrength));
             BuildVolume();
             BuildReflectionProbe();
         }
@@ -73,7 +81,7 @@ namespace Offroad.World
             var bloom = profile.Add<Bloom>(true);
             bloom.intensity.Override(bloomIntensity);
             bloom.threshold.Override(bloomThreshold);
-            bloom.scatter.Override(0.7f);
+            bloom.scatter.Override(0.72f);
             bloom.tint.Override(new Color(1f, 0.92f, 0.82f));
             bloom.highQualityFiltering.Override(false);
             bloom.downscale.Override(BloomDownscaleMode.Quarter);   // a soft glow looks the same from quarter res

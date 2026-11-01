@@ -89,7 +89,9 @@ Shader "Offroad/Clouds"
                 Light sun = GetMainLight();
                 float2 toSun = normalize(sun.direction.xz + 1e-4);
                 float lit = saturate(0.55 + 0.45 * (Fbm(q * 2.0 + toSun * 0.06) < shape ? 1.0 : 0.2));
-                half3 col = lerp(_ShadeColor.rgb, _LitColor.rgb, lit * (1.0 - density * 0.35));
+                half3 sunTint = sun.color / max(max(sun.color.r, sun.color.g), max(sun.color.b, 1e-3));
+                half3 litCol = _LitColor.rgb * lerp(half3(1, 1, 1), sunTint, 0.65);
+                half3 col = lerp(_ShadeColor.rgb, litCol, lit * (1.0 - density * 0.35));
                 col += pow(saturate(dot(d, sun.direction)), 8.0) * 0.25 * sun.color;   // silver lining near the sun
                 half horizon = saturate(d.y * 6.0);
                 col = lerp(_HorizonColor.rgb, col, horizon);

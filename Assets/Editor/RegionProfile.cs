@@ -59,6 +59,7 @@ namespace Offroad.EditorTools
         public float farHazeAmount, farHazeHeight, midHazeAmount, midHazeHeight, farSnowLine;
         public float contrast, saturation, temperature;
         public float cloudCoverage;
+        public Color zenith, horizon, sunGlow;     // sky; its horizon haze is fogColor
     }
 
     public static class RegionProfiles
@@ -88,13 +89,14 @@ namespace Offroad.EditorTools
                 ["Rock"] = new PropKind { cullHeight = 0.012f, shadows = false, collider = 2, alignToGround = 0.8f },
                 ["DeadTree"] = new PropKind { cullHeight = 0.006f, shadows = true, collider = 3, alignToGround = 0.05f },
             },
-            sunEuler = new Vector3(36f, 205f, 0f), sunColor = new Color(1f, 0.92f, 0.80f), sunIntensity = 2.45f,
-            ambientSky = new Color(0.41f, 0.51f, 0.72f), ambientEquator = new Color(0.62f, 0.52f, 0.45f),
-            ambientGround = new Color(0.39f, 0.25f, 0.17f), fogColor = new Color(0.72f, 0.77f, 0.84f),
+            sunEuler = new Vector3(25f, 205f, 0f), sunColor = new Color(1f, 0.84f, 0.66f), sunIntensity = 2.75f,
+            ambientSky = new Color(0.36f, 0.46f, 0.68f), ambientEquator = new Color(0.58f, 0.48f, 0.40f),
+            ambientGround = new Color(0.42f, 0.26f, 0.16f), fogColor = new Color(0.76f, 0.77f, 0.80f),
+            zenith = new Color(0.13f, 0.28f, 0.58f), horizon = new Color(0.62f, 0.70f, 0.82f), sunGlow = new Color(1f, 0.68f, 0.40f),
             skyTint = new Color(0.40f, 0.50f, 0.70f), atmosphereThickness = 0.85f, skyExposure = 1.25f,
-            farLit = new Color(0.56f, 0.61f, 0.74f), farShadow = new Color(0.38f, 0.45f, 0.60f), farHaze = new Color(0.74f, 0.79f, 0.87f),
+            farLit = new Color(0.58f, 0.60f, 0.72f), farShadow = new Color(0.36f, 0.42f, 0.58f), farHaze = new Color(0.76f, 0.77f, 0.80f),
             farHazeAmount = 0.5f, farHazeHeight = 420f, farSnowLine = 0f,
-            midLit = new Color(0.80f, 0.47f, 0.33f), midShadow = new Color(0.52f, 0.32f, 0.27f), midHaze = new Color(0.74f, 0.77f, 0.84f),
+            midLit = new Color(0.84f, 0.48f, 0.32f), midShadow = new Color(0.50f, 0.31f, 0.27f), midHaze = new Color(0.76f, 0.77f, 0.80f),
             midHazeAmount = 0.42f, midHazeHeight = 180f,
             contrast = 15f, saturation = 5f, temperature = 2f,
             cloudCoverage = 0.34f,
@@ -128,13 +130,14 @@ namespace Offroad.EditorTools
                 ["Log"] = new PropKind { cullHeight = 0.008f, shadows = true, collider = 2, alignToGround = 0.9f },
                 ["Stump"] = new PropKind { cullHeight = 0.01f, shadows = true, collider = 2, alignToGround = 0.3f },
             },
-            sunEuler = new Vector3(40f, 140f, 0f), sunColor = new Color(1f, 0.95f, 0.86f), sunIntensity = 2.25f,
-            ambientSky = new Color(0.52f, 0.60f, 0.70f), ambientEquator = new Color(0.50f, 0.54f, 0.46f),
-            ambientGround = new Color(0.30f, 0.31f, 0.23f), fogColor = new Color(0.66f, 0.74f, 0.80f),
+            sunEuler = new Vector3(27f, 300f, 0f), sunColor = new Color(1f, 0.88f, 0.72f), sunIntensity = 2.5f,
+            ambientSky = new Color(0.50f, 0.59f, 0.72f), ambientEquator = new Color(0.48f, 0.53f, 0.46f),
+            ambientGround = new Color(0.29f, 0.30f, 0.22f), fogColor = new Color(0.70f, 0.76f, 0.82f),
+            zenith = new Color(0.17f, 0.33f, 0.62f), horizon = new Color(0.63f, 0.72f, 0.83f), sunGlow = new Color(1f, 0.78f, 0.55f),
             skyTint = new Color(0.42f, 0.52f, 0.66f), atmosphereThickness = 1.0f, skyExposure = 1.15f,
-            farLit = new Color(0.66f, 0.72f, 0.82f), farShadow = new Color(0.34f, 0.42f, 0.55f), farHaze = new Color(0.70f, 0.77f, 0.85f),
+            farLit = new Color(0.66f, 0.72f, 0.82f), farShadow = new Color(0.34f, 0.42f, 0.55f), farHaze = new Color(0.70f, 0.76f, 0.82f),
             farHazeAmount = 0.55f, farHazeHeight = 420f, farSnowLine = 0.62f,
-            midLit = new Color(0.20f, 0.28f, 0.22f), midShadow = new Color(0.11f, 0.16f, 0.14f), midHaze = new Color(0.60f, 0.68f, 0.75f),
+            midLit = new Color(0.20f, 0.28f, 0.22f), midShadow = new Color(0.11f, 0.16f, 0.14f), midHaze = new Color(0.70f, 0.76f, 0.82f),
             midHazeAmount = 0.5f, midHazeHeight = 220f,
             contrast = 14f, saturation = 4f, temperature = -3f,
             cloudCoverage = 0.5f,

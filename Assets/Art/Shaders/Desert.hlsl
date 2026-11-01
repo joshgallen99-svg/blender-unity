@@ -21,6 +21,24 @@ float _OffroadStrataWarp;
 TEXTURE2D(_OffroadHazard); SAMPLER(sampler_OffroadHazard);
 float _OffroadHazardOn;
 
+// Aerial perspective: distance haze that turns towards the sun's glow colour when looking sunward
+// (matching the sky's glow) and thins out higher up, so distant peaks stay crisper than the valley.
+float4 _OffroadSunFogColor;     // rgb: haze colour toward the sun, a: strength (set by Atmosphere.cs)
+
+half3 OffroadFog(half3 col, float3 positionWS, half fogCoord)
+{
+#if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+    half visible = ComputeFogIntensity(fogCoord);
+    float3 v = normalize(positionWS - _WorldSpaceCameraPos);
+    half sunward = pow(saturate(dot(v, _MainLightPosition.xyz)), 5.0) * _OffroadSunFogColor.a;
+    half3 fogCol = lerp(unity_FogColor.rgb, _OffroadSunFogColor.rgb, sunward);
+    visible = lerp(visible, 1.0, saturate((positionWS.y - _WorldSpaceCameraPos.y) / 450.0) * 0.35);
+    return lerp(fogCol, col, visible);
+#else
+    return col;
+#endif
+}
+
 float OffroadHash(float n) { return frac(sin(n * 12.9898) * 43758.5453); }
 
 half3 StrataBand(float i)

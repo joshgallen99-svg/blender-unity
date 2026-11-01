@@ -40,7 +40,13 @@ cost so a fanless MacBook Air holds 60 FPS on Medium.
 10. **A living sky.** Procedural cumulus (Clouds.shader) drift over both regions, lit from the sun
     side with a silver lining near it and fading into the horizon haze; sparse over the canyon, fuller
     over the valley.
-11. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
+11. **Cinematic light.** A low sun (golden hour: late afternoon over the canyon, seen against the light
+    up the valley; morning side-light in the forest), warm key against a cool sky fill. The custom sky
+    (Sky.shader) has a clean gradient, a horizon haze band in exactly the fog colour so land melts into
+    sky, a warm glow around the sun and an HDR disc that blooms. Distance haze turns toward that glow
+    colour when looking sunward (`OffroadFog` in Desert.hlsl) and thins with height; clouds take on the
+    sun's colour. Soft shadows and SMAA from Medium up.
+12. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
    ranges (2.6–3.4 km), with bluer haze the further you go.
 
 ## Palette (linear)

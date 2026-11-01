@@ -127,8 +127,9 @@ namespace Offroad.EditorTools
             sun.shadowStrength = 0.9f;
             go.transform.rotation = Quaternion.Euler(P.sunEuler);
 
-            RenderSettings.skybox = P == RegionProfiles.Desert ? MaterialLibrary.Skybox()
-                : MaterialLibrary.Skybox($"Skybox_{P.title}", P.skyTint, P.atmosphereThickness, P.skyExposure, P.ambientGround);
+            // Custom sky: its horizon haze is the fog colour, so distant land melts into it.
+            RenderSettings.skybox = MaterialLibrary.Sky($"Sky_{P.title}", P.zenith, P.horizon, P.fogColor,
+                Color.Lerp(P.ambientGround, P.fogColor, 0.5f), P.sunGlow);
             RenderSettings.sun = sun;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = P.ambientSky;
@@ -962,6 +963,7 @@ namespace Offroad.EditorTools
             atmosphere.contrast = P.contrast;
             atmosphere.saturation = P.saturation;
             atmosphere.temperature = P.temperature;
+            atmosphere.sunFogColor = P.sunGlow;
             go.AddComponent<DiscoveryTracker>().player = vehicle.transform;
             var trails = go.AddComponent<GroundTrails>();     // tyre tracks pressed into soft ground
             trails.stampShader = Shader.Find("Hidden/Offroad/TrailStamp");

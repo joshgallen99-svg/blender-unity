@@ -141,7 +141,7 @@ Shader "Offroad/Water"
                 d.shadowMask = half4(1, 1, 1, 1);
 
                 half4 color = UniversalFragmentPBR(d, s);
-                color.rgb = MixFog(color.rgb, d.fogCoord);
+                color.rgb = OffroadFog(color.rgb, p, d.fogCoord);
                 return half4(color.rgb, alpha);
             }
             ENDHLSL

@@ -64,6 +64,7 @@ Shader "Offroad/Foliage"
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Desert.hlsl"
 
             struct Attributes
             {
@@ -131,7 +132,7 @@ Shader "Offroad/Foliage"
                 half back = saturate(dot(-d.viewDirectionWS, mainLight.direction));
                 color.rgb += tex.rgb * mainLight.color * back * back * _Translucency * mainLight.shadowAttenuation;
 
-                color.rgb = MixFog(color.rgb, d.fogCoord);
+                color.rgb = OffroadFog(color.rgb, i.positionWS, d.fogCoord);
                 return half4(color.rgb, 1);
             }
             ENDHLSL
