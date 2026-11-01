@@ -58,6 +58,7 @@ namespace Offroad.EditorTools
         public Color farLit, farShadow, farHaze, midLit, midShadow, midHaze;
         public float farHazeAmount, farHazeHeight, midHazeAmount, midHazeHeight, farSnowLine;
         public float contrast, saturation, temperature;
+        public float cloudCoverage;
     }
 
     public static class RegionProfiles
@@ -96,6 +97,7 @@ namespace Offroad.EditorTools
             midLit = new Color(0.80f, 0.47f, 0.33f), midShadow = new Color(0.52f, 0.32f, 0.27f), midHaze = new Color(0.74f, 0.77f, 0.84f),
             midHazeAmount = 0.42f, midHazeHeight = 180f,
             contrast = 15f, saturation = 5f, temperature = 2f,
+            cloudCoverage = 0.34f,
         };
 
         public static readonly RegionProfile Forest = new RegionProfile
@@ -135,6 +137,7 @@ namespace Offroad.EditorTools
             midLit = new Color(0.20f, 0.28f, 0.22f), midShadow = new Color(0.11f, 0.16f, 0.14f), midHaze = new Color(0.60f, 0.68f, 0.75f),
             midHazeAmount = 0.5f, midHazeHeight = 220f,
             contrast = 14f, saturation = 4f, temperature = -3f,
+            cloudCoverage = 0.5f,
         };
 
         public static readonly RegionProfile[] All = { Desert, Forest };

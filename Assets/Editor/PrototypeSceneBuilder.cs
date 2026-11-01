@@ -147,6 +147,8 @@ namespace Offroad.EditorTools
                 P.farHazeAmount, P.farHazeHeight, P.farSnowLine > 0 ? 300f : 0f);
             backdrop.midMaterial = MaterialLibrary.Backdrop($"{prefix}BackdropMesas", P.midLit, P.midShadow, P.midHaze,
                 P.midHazeAmount, P.midHazeHeight);
+            var clouds = backdrop.gameObject.AddComponent<SkyClouds>();
+            clouds.material = MaterialLibrary.Clouds($"Clouds{P.title}", P.cloudCoverage, P.fogColor);
             return sun;
         }
 

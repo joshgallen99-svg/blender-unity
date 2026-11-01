@@ -201,6 +201,16 @@ namespace Offroad.EditorTools
             return m;
         }
 
+        public static Material Clouds(string name, float coverage, Color horizon)
+        {
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Clouds");
+            m.SetFloat("_Coverage", coverage);
+            m.SetColor("_HorizonColor", horizon);
+            m.renderQueue = 2900;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         public static Material Water()
         {
             var m = LoadOrCreate($"{Dir}/Water.mat", "Offroad/Water");
