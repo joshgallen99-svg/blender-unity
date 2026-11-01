@@ -62,7 +62,7 @@ namespace Offroad.Vehicles
         [Range(0.05f, 1.5f)] public float bumpDamping = 0.35f;     // damping ratios (1 = critical)
         [Range(0.05f, 1.5f)] public float reboundDamping = 0.55f;
         [Tooltip("Anti-roll stiffness as a multiple of the spring rate.")]
-        public float antiRoll = 0.6f;
+        public float antiRoll = 1.2f;
 
         [Header("Drivetrain")]
         public float enginePower = 165000f;      // watts at the wheels
@@ -341,9 +341,10 @@ namespace Offroad.Vehicles
                     if (b.left || b.front != a.front) continue;
                     float ca = a.grounded ? suspensionTravel - a.springLength : 0f;
                     float cb = b.grounded ? suspensionTravel - b.springLength : 0f;
+                    // The more-compressed side gets extra lift, the other side less: resists body roll.
                     float f = (ca - cb) * k;
-                    if (a.grounded) Body.AddForceAtPosition(-up * f, WheelCenterWorld(a));
-                    if (b.grounded) Body.AddForceAtPosition(up * f, WheelCenterWorld(b));
+                    if (a.grounded) Body.AddForceAtPosition(up * f, WheelCenterWorld(a));
+                    if (b.grounded) Body.AddForceAtPosition(-up * f, WheelCenterWorld(b));
                 }
             }
         }

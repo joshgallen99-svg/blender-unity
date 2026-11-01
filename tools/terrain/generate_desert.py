@@ -79,7 +79,7 @@ path_z = SIZE * (0.06 + 0.88 * t)
 tree = cKDTree(np.c_[path_x, path_z])
 d_wash, _ = tree.query(np.c_[xs.ravel(), ys.ravel()])
 d_wash = d_wash.reshape(N, N)
-wash = -7.0 * np.exp(-(d_wash / 20.0) ** 2) - 3.0 * np.exp(-(d_wash / 60.0) ** 2)
+wash = -6.0 * (1.0 - smoothstep(9.0, 38.0, d_wash)) - 2.5 * np.exp(-(d_wash / 70.0) ** 2)   # flat floor, soft banks
 keep_clear = smoothstep(18, 55, d_wash) * spawn_mask           # mesas stay off the trail and spawn
 
 
@@ -248,11 +248,10 @@ def save_maps(name, albedo, height, strength):
 # Sand: warm orange with wind ripples.
 yy, xx = np.mgrid[0:T, 0:T] / T
 warp = tile_noise(2.5, 1)
-ripples = 0.5 + 0.5 * np.sin(2 * math.pi * (yy * 14 + xx * 3 + warp * 2.0))
+ripples = 0.5 + 0.5 * np.sin(2 * math.pi * (yy * 9 + xx * 2 + warp * 3.0))
 grain = tile_noise(0.6, 2)
-hs = ripples * 0.6 + grain * 0.4
-save_maps("Sand", colorize(0.55 * tile_noise(2.0, 3) + 0.25 * ripples + 0.2 * grain,
-                           (0.66, 0.40, 0.24), (0.86, 0.60, 0.40)), hs, 6.0)
+save_maps("Sand", colorize(0.62 * tile_noise(2.0, 3) + 0.10 * ripples + 0.28 * grain,
+                           (0.62, 0.45, 0.33), (0.80, 0.63, 0.47)), ripples * 0.35 + grain * 0.65, 2.5)
 
 # Gravel: pebbles in a dusty matrix.
 f1, edge = voronoi(260, 4)

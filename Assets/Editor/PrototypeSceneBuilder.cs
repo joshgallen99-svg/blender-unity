@@ -180,7 +180,7 @@ namespace Offroad.EditorTools
 
         static TerrainLayer CreateLayer(string name)
         {
-            float tile = name switch { "Sand" => 7f, "Gravel" => 4f, "CrackedSoil" => 9f, "RedRock" => 14f, _ => 8f };
+            float tile = name switch { "Sand" => 12f, "Gravel" => 5f, "CrackedSoil" => 10f, "RedRock" => 16f, _ => 8f };
             var layer = new TerrainLayer
             {
                 diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{name}_albedo.png"),

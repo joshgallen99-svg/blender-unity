@@ -14,10 +14,10 @@ namespace Offroad.World
     public class Atmosphere : MonoBehaviour
     {
         [Header("Grading")]
-        public float postExposure = 0.15f;
-        public float contrast = 12f;
-        public float saturation = 8f;
-        public float temperature = 10f;
+        public float postExposure = 0.05f;
+        public float contrast = 8f;
+        public float saturation = -6f;
+        public float temperature = 4f;
         public float bloomIntensity = 0.55f;
         public float bloomThreshold = 1.05f;
         public float vignette = 0.22f;

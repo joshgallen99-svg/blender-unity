@@ -94,7 +94,7 @@ public class VehiclePhysicsTests
         float turned = Mathf.Abs(Mathf.DeltaAngle(yaw0, _vehicle.transform.eulerAngles.y));
         Debug.Log($"Turn entry {speed * 3.6f:0} km/h, turned {turned:0} deg, min upright {minUp:0.000}");
         Assert.Greater(turned, 45f, "should turn noticeably in 4 s");
-        Assert.Greater(minUp, 0.75f, "should not roll over in a full-lock turn");
+        Assert.Greater(minUp, 0.978f, "body roll in a full-lock turn should stay under ~12 degrees");
     }
 
     [UnityTest]
