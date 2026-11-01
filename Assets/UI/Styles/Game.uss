@@ -183,3 +183,6 @@
 
 /* ---------------------------------------------------------------- results */
 .result { position: absolute; left: 50%; top: 50%; width: 640px; margin-left: -320px; margin-top: -200px; align-items: center; }
+
+.hazard-warning { position: absolute; left: 0; right: 0; top: 150px; -unity-text-align: middle-center; font-size: 22px;
+    -unity-font-style: bold; letter-spacing: 2px; color: rgb(255, 214, 160); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8); }

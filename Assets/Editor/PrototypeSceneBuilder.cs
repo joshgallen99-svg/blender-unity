@@ -55,8 +55,10 @@ namespace Offroad.EditorTools
             public PieceInfo[] markers;
             public FormationInfo[] formations;
             public float[] roadX, roadZ;
+            public TrackInfo[] tracks;
         }
         [Serializable] public class FormationInfo { public string model; public float x, z, yaw, scale, sink; }
+        [Serializable] public class TrackInfo { public string name; public float width; public float[] x, z, washboard, fade; }
         [Serializable] public class PieceInfo { public string model; public float x, z, yaw, sink, align; }
         [Serializable] public class LandmarkInfo
         {
@@ -110,7 +112,7 @@ namespace Offroad.EditorTools
             var sun = CreateLighting();
             var terrain = CreateTerrain(info);
             PlaceFormations(terrain, info);
-            CreateRoad(terrain, info);
+            CreateTracks(terrain, info);
             PlaceProps(terrain, info);
             PlaceLandmarks(terrain, info);
             var vehicle = CreateVehicle(terrain, info);
@@ -217,7 +219,9 @@ namespace Offroad.EditorTools
             t.basemapDistance = 20000f;         // never switch to Unity's basemap shader
             t.drawTreesAndFoliage = false;
             t.shadowCastingMode = ShadowCastingMode.On;
-            go.AddComponent<TerrainSurfaces>();
+            var surfaces = go.AddComponent<TerrainSurfaces>();
+            var hazard = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Masks/{Region}_hazard.png");
+            surfaces.hazardMap = hazard;      // mud, quicksand, washboard, water (read on the CPU too)
 
             // Heightmap as a texture for the rock shader's sand skirt.
             var htex = new Texture2D(res, res, TextureFormat.RHalf, false, true)
@@ -236,6 +240,7 @@ namespace Offroad.EditorTools
             var globals = go.AddComponent<TerrainGlobals>();
             globals.terrain = t;
             globals.heightTexture = htex;
+            globals.hazardTexture = hazard;
             globals.Publish();
             return t;
         }
@@ -418,55 +423,92 @@ namespace Offroad.EditorTools
 
         // ------------------------------------------------------------------ road
 
-        /// <summary>Asphalt ribbon following the highway path, draped on the (flattened) terrain.</summary>
-        static void CreateRoad(Terrain terrain, RegionInfo info)
+        /// <summary>
+        /// Dirt tracks: ribbons draped on the terrain and drawn with the DirtTrack decal shader (wheel
+        /// ruts, grassy crown, washboard, soft edges). Per vertex: uv0 = (metres from centre line,
+        /// metres along), uv1.x = half width, colour = (washboard, wear, fade), tangent = across.
+        /// Each track is split into chunks so off-screen parts are culled.
+        /// </summary>
+        static void CreateTracks(Terrain terrain, RegionInfo info)
         {
-            if (info.roadX == null || info.roadX.Length < 2) return;
-            const float halfWidth = 4f;
-            var verts = new List<Vector3>();
-            var uvs = new List<Vector2>();
-            var tris = new List<int>();
-            float dist = 0f;
-            int n = info.roadX.Length;
-            for (int i = 0; i < n; i++)
+            if (info.tracks == null) return;
+            var root = new GameObject("Tracks").transform;
+            var material = MaterialLibrary.DirtTrack();
+            var td = terrain.terrainData;
+            const int Across = 9;
+            const int ChunkPoints = 120;
+            foreach (var t in info.tracks)
             {
-                var p = new Vector3(info.roadX[i], 0f, info.roadZ[i]);
-                var prev = new Vector3(info.roadX[Mathf.Max(i - 1, 0)], 0f, info.roadZ[Mathf.Max(i - 1, 0)]);
-                var next = new Vector3(info.roadX[Mathf.Min(i + 1, n - 1)], 0f, info.roadZ[Mathf.Min(i + 1, n - 1)]);
-                var dir = (next - prev).normalized;
-                var right = new Vector3(dir.z, 0f, -dir.x);
-                if (i > 0) dist += Vector3.Distance(p, prev);
-                for (int s = 0; s <= 4; s++)
+                int n = t.x.Length;
+                if (n < 2) continue;
+                float half = t.width * 0.5f;
+                float reach = half * 1.35f;              // ribbon is wider than the track: soft edges
+                float wear = t.name == "main" ? 1f : 0.65f;
+                var dist = new float[n];
+                for (int i = 1; i < n; i++) dist[i] = dist[i - 1] + Vector2.Distance(new Vector2(t.x[i], t.z[i]), new Vector2(t.x[i - 1], t.z[i - 1]));
+
+                for (int start = 0, chunk = 0; start < n - 1; start += ChunkPoints, chunk++)
                 {
-                    float u = s / 4f;
-                    var q = p + right * Mathf.Lerp(-halfWidth, halfWidth, u);
-                    q.y = terrain.SampleHeight(q) + terrain.transform.position.y + 0.05f;
-                    verts.Add(q);
-                    uvs.Add(new Vector2(u, dist / 16f));
-                }
-                if (i == 0) continue;
-                int a = (i - 1) * 5, b = i * 5;
-                for (int s = 0; s < 4; s++)
-                {
-                    tris.Add(a + s); tris.Add(b + s); tris.Add(b + s + 1);
-                    tris.Add(a + s); tris.Add(b + s + 1); tris.Add(a + s + 1);
+                    int end = Mathf.Min(start + ChunkPoints, n - 1);
+                    var verts = new List<Vector3>();
+                    var normals = new List<Vector3>();
+                    var tangents = new List<Vector4>();
+                    var uv0 = new List<Vector2>();
+                    var uv1 = new List<Vector2>();
+                    var cols = new List<Color>();
+                    var tris = new List<int>();
+                    for (int i = start; i <= end; i++)
+                    {
+                        var p = new Vector3(t.x[i], 0f, t.z[i]);
+                        int ip = Mathf.Max(i - 1, 0), inx = Mathf.Min(i + 1, n - 1);
+                        var dir = new Vector3(t.x[inx] - t.x[ip], 0f, t.z[inx] - t.z[ip]).normalized;
+                        var right = new Vector3(dir.z, 0f, -dir.x);
+                        float wash = t.washboard != null && t.washboard.Length == n ? t.washboard[i] : 0f;
+                        float fade = t.fade != null && t.fade.Length == n ? t.fade[i] : 1f;
+                        for (int s = 0; s < Across; s++)
+                        {
+                            float lat = Mathf.Lerp(-reach, reach, s / (Across - 1f));
+                            var q = p + right * lat;
+                            var nrm = td.GetInterpolatedNormal(q.x / td.size.x, q.z / td.size.z);
+                            q.y = terrain.SampleHeight(q) + terrain.transform.position.y + 0.06f;
+                            verts.Add(q);
+                            normals.Add(nrm);
+                            var across = Vector3.ProjectOnPlane(right, nrm).normalized;
+                            tangents.Add(new Vector4(across.x, across.y, across.z, 1f));
+                            uv0.Add(new Vector2(lat, dist[i]));
+                            uv1.Add(new Vector2(half, 0f));
+                            cols.Add(new Color(wash, wear, fade, 1f));
+                        }
+                        if (i == start) continue;
+                        int a = (i - start - 1) * Across, b = (i - start) * Across;
+                        for (int s = 0; s < Across - 1; s++)
+                        {
+                            tris.Add(a + s); tris.Add(b + s); tris.Add(b + s + 1);
+                            tris.Add(a + s); tris.Add(b + s + 1); tris.Add(a + s + 1);
+                        }
+                    }
+                    var mesh = new Mesh { name = $"Track_{t.name}_{chunk}" };
+                    mesh.SetVertices(verts);
+                    mesh.SetNormals(normals);
+                    mesh.SetTangents(tangents);
+                    mesh.SetUVs(0, uv0);
+                    mesh.SetUVs(1, uv1);
+                    mesh.SetColors(cols);
+                    mesh.SetTriangles(tris, 0);
+                    mesh.RecalculateBounds();
+                    var path = $"{GeneratedDir}/Tracks/{mesh.name}.asset";
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));
+                    AssetDatabase.DeleteAsset(path);
+                    AssetDatabase.CreateAsset(mesh, path);
+                    var go = new GameObject(mesh.name);
+                    go.transform.SetParent(root, false);
+                    go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                    var mr = go.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = material;
+                    mr.shadowCastingMode = ShadowCastingMode.Off;
+                    go.isStatic = true;
                 }
             }
-            var mesh = new Mesh { name = "Highway", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
-            mesh.SetVertices(verts);
-            mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateTangents();
-            mesh.RecalculateBounds();
-            var path = $"{GeneratedDir}/Highway.asset";
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(mesh, path);
-            var go = new GameObject("Highway");
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = MaterialLibrary.Road();
-            mr.shadowCastingMode = ShadowCastingMode.Off;
         }
 
         static GameObject CreatePropPrefab(GameObject model, string name, PropKind kind)

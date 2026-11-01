@@ -117,7 +117,7 @@ namespace Offroad.Vehicles
                 GetOrAdd<MeshRenderer>(mesh).sharedMaterials = tireArt.materials;
             }
             float lvl = 1f + tire.GripPerLevel * l.TireLevel(tire.id);
-            v.tire = new TireProfile { grip = tire.grip * lvl, sandDrag = tire.sandDrag, rolling = tire.rolling };
+            v.tire = new TireProfile { grip = tire.grip * lvl, sandDrag = tire.sandDrag, rolling = tire.rolling, mudGrip = tire.mudGrip * lvl };
             v.wheelRadius = tire.radius;
 
             var spareDef = Catalog.Tire(ActiveSpare);

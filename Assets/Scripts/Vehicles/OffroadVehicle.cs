@@ -48,6 +48,9 @@ namespace Offroad.Vehicles
             [NonSerialized] public Vector3 contactNormal;
             [NonSerialized] public Collider contactCollider;
             [NonSerialized] public SurfaceInfo surface;
+            [NonSerialized] public float sink;           // how far the tyre has sunk into soft ground (m)
+            [NonSerialized] public float quickSink;      // the quicksand part of it, which builds up over time
+            [NonSerialized] public float washPhase;      // distance rolled over corrugations, in wavelengths
         }
 
         [Header("Wheels")]
@@ -88,6 +91,18 @@ namespace Offroad.Vehicles
         public float steerSpeed = 3.2f;
         public float steerReturnSpeed = 5f;
 
+        [Header("Soft ground")]
+        [Tooltip("How far tyres settle into wet mud (m).")]
+        public float mudSinkDepth = 0.11f;
+        [Tooltip("How fast quicksand swallows a slow or stopped vehicle (m/s).")]
+        public float quicksandSinkRate = 0.09f;
+        [Tooltip("Below this speed (m/s) quicksand pulls the vehicle down; above it the tyres climb back out.")]
+        public float quicksandEscapeSpeed = 3.5f;
+        public float quicksandMaxSink = 0.85f;
+        [Tooltip("Height of washboard corrugations (m) and their spacing (m).")]
+        public float washboardHeight = 0.014f;
+        public float washboardSpacing = 0.75f;
+
         [Header("Stability")]
         public Vector3 centerOfMass = new Vector3(0f, 0.58f, 0.05f);
         public float downforce = 2.5f;
@@ -103,6 +118,10 @@ namespace Offroad.Vehicles
         public int GroundedWheels { get; private set; }
         public bool IsReversing { get; private set; }
         public float SpringRate { get; private set; }
+        /// <summary>Deepest quicksand sink over all wheels (m): the HUD warns, recovery uses it.</summary>
+        public float QuicksandSink { get; private set; }
+        /// <summary>0..1 how hard the vehicle is being shaken by washboard right now.</summary>
+        public float Rattle { get; private set; }
 
         const float CastLift = 0.3f;              // start casts above the travel so close ground is not missed
         static readonly RaycastHit[] Hits = new RaycastHit[16];
@@ -112,6 +131,10 @@ namespace Offroad.Vehicles
         float _upsideDownTime;
         Vector3 _spawnPosition;
         Quaternion _spawnRotation;
+        Vector3 _safePosition;
+        Quaternion _safeRotation;
+        bool _hasSafe;
+        float _safeTimer;
 
         void Awake()
         {
@@ -240,7 +263,10 @@ namespace Offroad.Vehicles
                 {
                     fLong += stopForce;                        // hold on slopes when no pedal is pressed
                 }
-                fLong -= vLong * (rollingResistance * tire.rolling + w.surface.drag * 220f * tire.DragOn(w.surface));
+                fLong -= vLong * (rollingResistance * tire.rolling + w.surface.drag * 220f * tire.DragOn(w.surface)
+                                  + w.sink * 1800f);                       // ploughing through soft ground
+                if (w.surface.washboard > 0.01f)
+                    grip *= 1f - 0.22f * w.surface.washboard * Mathf.Clamp01(Mathf.Abs(vLong) / 12f);
 
                 float latGrip = lateralStiffness * (handbraked ? handbrakeRearGrip : 1f);
                 float fLat = -(vLat / dt + gLat) * massShare * latGrip;
@@ -269,6 +295,32 @@ namespace Offroad.Vehicles
                 Body.AddTorque(torque, ForceMode.Acceleration);
             }
             CheckAutoRight(dt);
+            TrackSoftGround(dt);
+        }
+
+        void TrackSoftGround(float dt)
+        {
+            float deepest = 0f, rattle = 0f, hazard = 0f;
+            foreach (var w in wheels)
+            {
+                deepest = Mathf.Max(deepest, w.quickSink);
+                if (!w.grounded) continue;
+                rattle = Mathf.Max(rattle, w.surface.washboard * Mathf.Clamp01(Mathf.Abs(ForwardSpeed) / 10f));
+                hazard = Mathf.Max(hazard, w.surface.quicksand + w.surface.mud * 0.5f);
+            }
+            QuicksandSink = deepest;
+            Rattle = rattle;
+
+            // Remember the last spot on firm ground, for recovery.
+            _safeTimer += dt;
+            if (_safeTimer > 1f && GroundedWheels >= 3 && hazard < 0.05f && deepest < 0.01f &&
+                Vector3.Dot(transform.up, Vector3.up) > 0.85f)
+            {
+                _safeTimer = 0f;
+                _safePosition = transform.position;
+                _safeRotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(transform.forward, Vector3.up), Vector3.up);
+                _hasSafe = true;
+            }
         }
 
         float TractiveForce(float speed, float limit)
@@ -317,7 +369,12 @@ namespace Offroad.Vehicles
 
             var hit = Hits[bestIdx];
             w.grounded = true;
-            w.springLength = Mathf.Clamp(best - CastLift, 0f, suspensionTravel);
+            // Soft ground: the tyre sits below the collider surface by its sink depth; washboard
+            // corrugations push it up and down as it rolls.
+            float corrugation = w.surface.washboard > 0.01f
+                ? washboardHeight * w.surface.washboard * (0.5f + 0.5f * Mathf.Sin(w.washPhase * 2f * Mathf.PI))
+                : 0f;
+            w.springLength = Mathf.Clamp(best - CastLift + w.sink - corrugation, 0f, suspensionTravel);
             Vector3 center = anchor - up * w.springLength;
             bool overlapped = hit.point == Vector3.zero && hit.distance <= 0f;
             w.contactPoint = overlapped ? center - up * wheelRadius : hit.point;
@@ -325,6 +382,24 @@ namespace Offroad.Vehicles
             if (w.contactCollider != hit.collider || surfaceProvider != null)
                 w.surface = surfaceProvider != null ? surfaceProvider.GetSurface(w.contactPoint, hit.collider) : SurfaceInfo.Default;
             w.contactCollider = hit.collider;
+            UpdateSink(w, Time.fixedDeltaTime);
+        }
+
+        void UpdateSink(Wheel w, float dt)
+        {
+            float speed = Mathf.Abs(ForwardSpeed);
+            if (w.surface.quicksand > 0.05f)
+            {
+                // Slow or stopped: sink. Fast: the tyres climb back out.
+                float pull = speed < quicksandEscapeSpeed
+                    ? quicksandSinkRate * (1f - speed / quicksandEscapeSpeed)
+                    : -quicksandSinkRate * 2.5f * Mathf.Min(1f, (speed - quicksandEscapeSpeed) / 3f);
+                w.quickSink = Mathf.Clamp(w.quickSink + pull * w.surface.quicksand * dt, 0f, quicksandMaxSink);
+            }
+            else w.quickSink = Mathf.MoveTowards(w.quickSink, 0f, 0.6f * dt);
+            float target = w.surface.mud * mudSinkDepth + w.quickSink;
+            w.sink = Mathf.MoveTowards(w.sink, target, 0.5f * dt);
+            if (w.surface.washboard > 0.01f) w.washPhase += Mathf.Abs(w.forwardSpeed) * dt / washboardSpacing;
         }
 
         Vector3 WheelCenterWorld(Wheel w) =>
@@ -360,9 +435,17 @@ namespace Offroad.Vehicles
             if (transform.position.y < -100f) Respawn();
         }
 
-        /// <summary>Lift the vehicle and put it back on its wheels, keeping its heading.</summary>
+        /// <summary>Lift the vehicle and put it back on its wheels, keeping its heading. If it is stuck in
+        /// quicksand or deep mud, tow it back to the last spot on firm ground instead.</summary>
         public void ResetUpright()
         {
+            bool stuck = QuicksandSink > 0.2f;
+            foreach (var w in wheels) stuck |= w.sink > 0.2f;
+            if (stuck && _hasSafe)
+            {
+                Teleport(_safePosition + Vector3.up * 0.6f, _safeRotation);
+                return;
+            }
             _upsideDownTime = 0f;
             Vector3 fwd = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
             if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
@@ -388,7 +471,8 @@ namespace Offroad.Vehicles
             transform.SetPositionAndRotation(position, rotation);
             Body.linearVelocity = Vector3.zero;
             Body.angularVelocity = Vector3.zero;
-            foreach (var w in wheels) w.spinSpeed = 0;
+            foreach (var w in wheels) { w.spinSpeed = 0; w.sink = 0; w.quickSink = 0; }
+            QuicksandSink = 0f;
         }
 
         void Update()

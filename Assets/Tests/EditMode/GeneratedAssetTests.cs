@@ -153,7 +153,10 @@ public class GeneratedAssetTests
             Assert.IsNotNull(forms.transform.Find(f.model), f.model);
             Assert.IsNotNull(forms.transform.Find(f.model + "_LOD1"), f.model + " LOD1");
         }
-        Assert.Greater(info.roadX.Length, 50, "highway path");
+        Assert.Greater(info.roadX.Length, 50, "main track path");
+        Assert.IsNotNull(info.tracks, "tracks");
+        Assert.GreaterOrEqual(info.tracks.Length, 6, "main track plus side tracks to the landmarks");
+        Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Masks/desert_hazard.png"), "hazard map");
         var scatter = JsonUtility.FromJson<PrototypeSceneBuilder.ScatterFile>(File.ReadAllText("Assets/Terrain/Source~/desert_scatter.json"));
         Assert.Greater(scatter.props.Length, 1000);
         Assert.That(info.spawn.x, Is.InRange(50f, info.size - 50f));

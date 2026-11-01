@@ -11,6 +11,8 @@ namespace Offroad.World
     {
         public Terrain terrain;
         public Texture2D heightTexture;     // normalised 0..1 heights (RHalf), covering the terrain rect
+        [Tooltip("RGBA hazards over the terrain rect: R wet mud, G quicksand, B washboard, A standing water.")]
+        public Texture2D hazardTexture;
         [Tooltip("Sandstone bands per metre of height.")]
         public float strataFrequency = 0.33f;
         [Tooltip("How strongly bands bend (cross-bedding).")]
@@ -21,6 +23,8 @@ namespace Offroad.World
         static readonly int HeightParams = Shader.PropertyToID("_OffroadTerrainHeightParams");
         static readonly int StrataFreq = Shader.PropertyToID("_OffroadStrataFreq");
         static readonly int StrataWarp = Shader.PropertyToID("_OffroadStrataWarp");
+        static readonly int HazardTex = Shader.PropertyToID("_OffroadHazard");
+        static readonly int HazardOn = Shader.PropertyToID("_OffroadHazardOn");
 
         void OnEnable() => Publish();
         void OnValidate() => Publish();
@@ -30,6 +34,8 @@ namespace Offroad.World
             if (!terrain) terrain = GetComponent<Terrain>();
             Shader.SetGlobalFloat(StrataFreq, strataFrequency);
             Shader.SetGlobalFloat(StrataWarp, strataWarp);
+            Shader.SetGlobalTexture(HazardTex, hazardTexture ? hazardTexture : Texture2D.blackTexture);
+            Shader.SetGlobalFloat(HazardOn, hazardTexture ? 1f : 0f);
             if (!terrain || terrain.terrainData == null || !heightTexture)
             {
                 Shader.SetGlobalVector(HeightParams, Vector4.zero);

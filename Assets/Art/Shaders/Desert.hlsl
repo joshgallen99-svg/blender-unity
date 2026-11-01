@@ -17,6 +17,9 @@ float4 _OffroadTerrainRect;     // xz origin, xz size
 float4 _OffroadTerrainHeightParams; // x: height range, y: terrain y position, z: has heightmap (0/1)
 float _OffroadStrataFreq;       // bands per metre
 float _OffroadStrataWarp;
+// Hazards over the terrain rect: R wet mud, G quicksand, B washboard, A standing water.
+TEXTURE2D(_OffroadHazard); SAMPLER(sampler_OffroadHazard);
+float _OffroadHazardOn;
 
 float OffroadHash(float n) { return frac(sin(n * 12.9898) * 43758.5453); }
 

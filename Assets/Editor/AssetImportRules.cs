@@ -6,7 +6,7 @@ namespace Offroad.EditorTools
     /// <summary>Import settings for generated models and textures, so nothing needs hand-tuning.</summary>
     public class AssetImportRules : AssetPostprocessor
     {
-        public override uint GetVersion() => 5;
+        public override uint GetVersion() => 6;
 
         void OnPreprocessModel()
         {
@@ -39,6 +39,7 @@ namespace Offroad.EditorTools
                 ti.maxTextureSize = 1024;
                 ti.textureCompression = TextureImporterCompression.Uncompressed;
                 ti.alphaSource = TextureImporterAlphaSource.FromInput;
+                ti.isReadable = assetPath.Contains("_hazard");   // vehicle physics samples it on the CPU
             }
             else if (assetPath.StartsWith("Assets/Terrain/Textures/"))
             {

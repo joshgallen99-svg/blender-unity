@@ -33,7 +33,7 @@ namespace Offroad.Game
             {
                 id = "needle", title = "Thread the Needle", reward = 250,
                 brief = "Head north to the great sandstone arch and drive through the Needle's Eye.",
-                tip = "Follow the old highway north through the valley, then turn east into mesa country.",
+                tip = "Follow the old wagon track north through the valley, then turn east into mesa country.",
                 targets = new[] { "needles_eye" },
             },
             new MissionDef

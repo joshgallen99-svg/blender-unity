@@ -17,12 +17,12 @@ namespace Offroad.UI
         readonly VisualElement _left, _right, _tabs, _top;
         readonly ScrollView _cards;
         readonly Label _scrap;
-        readonly StatBar _power, _weight, _speed, _sand, _gravel, _rock;
+        readonly StatBar _power, _weight, _speed, _sand, _gravel, _rock, _mud;
         string _tab = "Tyres";
 
         static readonly string[] Tabs = { "Body", "Tyres", "Spare", "Engine", "Suspension", "Kit", "Paint" };
 
-        struct Stats { public float power, weight, speed; public Vector4 grip; }
+        struct Stats { public float power, weight, speed, mud; public Vector4 grip; }
 
         public GarageView(UIRoot ui)
         {
@@ -66,7 +66,8 @@ namespace Offroad.UI
             _sand = new StatBar("Sand grip");
             _gravel = new StatBar("Gravel grip");
             _rock = new StatBar("Rock grip");
-            foreach (var b in new[] { _power, _weight, _speed, _sand, _gravel, _rock }) _right.Add(b);
+            _mud = new StatBar("Mud grip");
+            foreach (var b in new[] { _power, _weight, _speed, _sand, _gravel, _rock, _mud }) _right.Add(b);
             _right.Add(UIKit.Box("divider"));
             var buttons = UIKit.Box("row");
             buttons.Add(UIKit.Button("Back", () => _ui.flow.GoTitle(), "btn-ghost"));
@@ -193,7 +194,8 @@ namespace Offroad.UI
             var grav = new StatBar("Gravel"); grav.Set(t.grip.y * m / 1.4f, $"{t.grip.y * m:0.00}x");
             var soil = new StatBar("Dirt"); soil.Set(t.grip.z * m / 1.4f, $"{t.grip.z * m:0.00}x");
             var rock = new StatBar("Rock"); rock.Set(t.grip.w * m / 1.4f, $"{t.grip.w * m:0.00}x");
-            foreach (var s in new[] { sand, grav, soil, rock }) grid.Add(s);
+            var mud = new StatBar("Mud"); mud.Set(t.mudGrip * m / 1.4f, $"{t.mudGrip * m:0.00}x");
+            foreach (var s in new[] { sand, grav, soil, rock, mud }) grid.Add(s);
             card.Add(grid);
             var row = Actions(card);
             if (!fitted) row.Add(UIKit.Button(owned ? "Fit" : $"Buy  {t.price}", () => Try(l.BuyOrEquipTire(t), t.name), owned ? "btn-ghost" : "btn-primary"));
@@ -284,6 +286,7 @@ namespace Offroad.UI
                 weight = mass,
                 speed = (34f + 1.2f * l.engineLevel) * 3.6f / tire.rolling,
                 grip = tire.grip * m,
+                mud = tire.mudGrip * m,
             };
         }
 
@@ -297,6 +300,7 @@ namespace Offroad.UI
             _sand.Set(cur.grip.x / 1.4f, $"{cur.grip.x:0.00}x", pre.grip.x / 1.4f);
             _gravel.Set(cur.grip.y / 1.4f, $"{cur.grip.y:0.00}x", pre.grip.y / 1.4f);
             _rock.Set(cur.grip.w / 1.4f, $"{cur.grip.w:0.00}x", pre.grip.w / 1.4f);
+            _mud.Set(cur.mud / 1.4f, $"{cur.mud:0.00}x", pre.mud / 1.4f);
         }
     }
 }

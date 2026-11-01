@@ -143,15 +143,17 @@ namespace Offroad.EditorTools
             return m;
         }
 
-        public static Material Road()
+        /// <summary>Dirt track decal (ruts, crown, washboard) draped over the terrain.</summary>
+        public static Material DirtTrack()
         {
-            var m = LoadOrCreate($"{Dir}/Road.mat", LitShader);
-            m.SetTexture("_BaseMap", Tex("Road_albedo"));
-            m.SetTexture("_BumpMap", Tex("Asphalt_normal"));
-            m.EnableKeyword("_NORMALMAP");
-            m.SetColor("_BaseColor", Color.white);
-            m.SetFloat("_Smoothness", 0.18f);
-            m.SetFloat("_Metallic", 0f);
+            var m = LoadOrCreate($"{Dir}/DirtTrack.mat", "Offroad/DirtTrack");
+            m.SetTexture("_DirtTex", Tex("TrackDirt_albedo"));
+            m.SetTexture("_DirtNrm", Tex("TrackDirt_normal"));
+            m.SetTexture("_SandTex", Tex("Sand_albedo"));
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetFloat("_DirtScale", 3f);
+            m.SetFloat("_SandScale", 3.5f);
+            m.renderQueue = 1950;      // after the terrain, before everything that writes depth over it
             EditorUtility.SetDirty(m);
             return m;
         }

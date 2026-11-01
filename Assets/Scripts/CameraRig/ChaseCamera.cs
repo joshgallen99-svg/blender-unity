@@ -67,6 +67,8 @@ namespace Offroad.CameraRig
             LateUpdate();
         }
 
+        Offroad.Vehicles.OffroadVehicle _vehicle;
+
         void LateUpdate()
         {
             if (!target) return;
@@ -139,6 +141,14 @@ namespace Offroad.CameraRig
                 float k = _showcaseBlend * _showcaseBlend * (3f - 2f * _showcaseBlend);
                 pos = Vector3.Lerp(pos, sp, k);
                 lookRot = Quaternion.Slerp(lookRot, sr, k);
+            }
+            // Washboard rattles the camera a little (the vehicle reports how hard it is being shaken).
+            if (_vehicle == null || _vehicle.Body != target) _vehicle = target.GetComponent<Offroad.Vehicles.OffroadVehicle>();
+            if (_vehicle != null && _vehicle.Rattle > 0.01f && Time.timeScale > 0f)
+            {
+                float tt = Time.time * 23f;
+                float amp = 0.035f * _vehicle.Rattle * (1f - _showcaseBlend);
+                pos += new Vector3(Mathf.PerlinNoise(tt, 0.3f) - 0.5f, Mathf.PerlinNoise(0.7f, tt) - 0.5f, 0f) * (2f * amp);
             }
             transform.position = pos;
             transform.rotation = lookRot;

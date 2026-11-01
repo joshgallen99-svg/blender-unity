@@ -28,7 +28,16 @@ cost so a fanless MacBook Air holds 60 FPS on Medium.
 7. **Contrast.** Deep, cool shadows against warm sunlit rock: moderate ambient fill, ACES with
    +15 contrast and +5 saturation, and gentle split toning (cool shadows, warm highlights). Fog starts at 30% of the view distance
    so mid-distance rock stays crisp.
-8. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
+8. **Dirt tracks, not roads.** An old wagon track runs up the valley with side tracks to every
+   landmark. Tracks are decal ribbons over the terrain (`DirtTrack.shader`): two compacted wheel ruts,
+   a crown with loose sand (weeds on side tracks), ragged sandy edges, washboard stretches, and they
+   fade out where dunes have drifted over them. Formations are pushed aside so tracks squeeze through
+   gaps in the rock.
+9. **Hazards read before you hit them.** Wet mud is dark and glossy with water in the ruts; quicksand
+   is pale, smooth and slowly breathing, ringed by damp sand and marked by a warning sign. Both come
+   from one hazard map (`desert_hazard.png`: R mud, G quicksand, B washboard, A water) that the
+   shaders and the vehicle physics read.
+10. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
    ranges (2.6–3.4 km), with bluer haze the further you go.
 
 ## Palette (linear)

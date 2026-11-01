@@ -31,6 +31,12 @@ namespace Offroad.World
         };
         public LayerSurface objects = new LayerSurface("Rock", 1.1f, 1.0f, 0f, 0.15f, new Color(0.6f, 0.4f, 0.3f));
 
+        [Header("Hazards")]
+        [Tooltip("Readable RGBA map over the terrain: R wet mud, G quicksand, B washboard, A standing water.")]
+        public Texture2D hazardMap;
+        public LayerSurface mud = new LayerSurface("Mud", 0.62f, 0.62f, 0.75f, 1.0f, new Color(0.30f, 0.21f, 0.15f));
+        public LayerSurface quicksand = new LayerSurface("Quicksand", 0.55f, 0.4f, 1.2f, 0.6f, new Color(0.62f, 0.5f, 0.38f));
+
         Terrain _terrain;
         TerrainCollider _collider;
         float[,,] _alpha;
@@ -77,7 +83,32 @@ namespace Offroad.World
             s.grip *= inv; s.traction *= inv; s.drag *= inv; s.dust *= inv;
             s.dustColor *= inv;
             s.dustColor.a = 1f;
+            if (hazardMap != null) ApplyHazards(ref s, local.x / td.size.x, local.z / td.size.z);
             return s;
+        }
+
+        /// <summary>Hazard values (mud, quicksand, washboard, water) at a normalised terrain position.</summary>
+        public Color HazardAt(float u, float v) => hazardMap != null ? hazardMap.GetPixelBilinear(u, v) : Color.clear;
+
+        void ApplyHazards(ref SurfaceInfo s, float u, float v)
+        {
+            var hz = hazardMap.GetPixelBilinear(u, v);
+            float mudW = Mathf.Clamp01(Mathf.Max(hz.r, hz.a));
+            float quick = Mathf.Clamp01(hz.g);
+            if (mudW > 0.02f) Blend(ref s, mud, mudW);
+            if (quick > 0.02f) Blend(ref s, quicksand, quick);
+            s.mud = mudW;
+            s.quicksand = quick;
+            s.washboard = Mathf.Clamp01(hz.b);
+        }
+
+        static void Blend(ref SurfaceInfo s, in LayerSurface l, float t)
+        {
+            s.grip = Mathf.Lerp(s.grip, l.grip, t);
+            s.traction = Mathf.Lerp(s.traction, l.traction, t);
+            s.drag = Mathf.Lerp(s.drag, l.drag, t);
+            s.dust = Mathf.Lerp(s.dust, l.dust, t);
+            s.dustColor = Color.Lerp(s.dustColor, l.dustColor, t);
         }
 
         static SurfaceInfo ToInfo(in LayerSurface l) => new SurfaceInfo

@@ -15,7 +15,7 @@ namespace Offroad.UI
         public readonly VisualElement Root;
         readonly UIRoot _ui;
         readonly SpeedGauge _gauge;
-        readonly Label _speed, _gear, _surface, _fitText, _objTitle, _objText, _objDist, _scrap, _fps, _spareName, _spareState, _hint;
+        readonly Label _speed, _gear, _surface, _fitText, _objTitle, _objText, _objDist, _scrap, _fps, _spareName, _spareState, _hint, _warning;
         readonly VisualElement _fitDot, _spareFill, _compass, _objective, _spare, _speedo, _surfaceChip, _scrapBox;
         readonly List<Label> _ticks = new List<Label>();
         readonly List<float> _tickAngles = new List<float>();
@@ -26,7 +26,7 @@ namespace Offroad.UI
 
         // Text is rebuilt at ~8 Hz (and only when it changes) so the HUD makes no garbage per frame.
         const float TextInterval = 0.125f;
-        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "PACKED DIRT", "ROCK" };
+        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "PACKED DIRT", "ROCK", "MUD", "QUICKSAND", "WASHBOARD" };
         static readonly string[] Numbers = BuildNumbers(400);
         readonly List<(float d, Landmark l)> _nearby = new List<(float, Landmark)>();
         readonly Vector3[] _markerTarget = new Vector3[8];
@@ -128,6 +128,8 @@ namespace Offroad.UI
 
             _hint = UIKit.Label("W/S drive & brake  ·  A/D steer  ·  Space handbrake  ·  R reset  ·  T swap to spare  ·  Esc pause", "hint", "anim");
             Root.Add(_hint);
+            _warning = UIKit.Label("", "hazard-warning", "anim");
+            Root.Add(_warning);
         }
 
         public void Show(MissionDef m)
@@ -164,17 +166,25 @@ namespace Offroad.UI
 
             // Surface under the wheels and how well the fitted tyres suit it.
             Vector4 layers = Vector4.zero;
+            float mud = 0f, quick = 0f, wash = 0f;
             int grounded = 0;
             foreach (var w in v.wheels)
             {
                 if (!w.grounded) continue;
                 layers += w.surface.layers;
+                mud += w.surface.mud;
+                quick += w.surface.quicksand;
+                wash += w.surface.washboard;
                 grounded++;
             }
             if (grounded > 0 && refreshText)
             {
                 int best = 0;
                 for (int i = 1; i < 4; i++) if (layers[i] > layers[best]) best = i;
+                float inv = 1f / grounded;
+                if (quick * inv > 0.3f) best = 5;
+                else if (mud * inv > 0.4f) best = 4;
+                else if (wash * inv > 0.3f) best = 6;
                 var tireId = _asm ? _asm.ActiveTire : "at";
                 float fit = v.tire.GripOn(new SurfaceInfo { layers = layers });
                 bool good = fit >= 1.05f, poor = fit < 0.88f;
@@ -219,6 +229,15 @@ namespace Offroad.UI
             if (_asm && runner && runner.Swapping) _spareFill.style.width = Length.Percent(runner.SwapProgress * 100f);
 
             if (!refreshText) return;
+
+            // Sinking warning.
+            bool sinking = v.QuicksandSink > 0.08f;
+            if (sinking)
+            {
+                SetText(_warning, v.QuicksandSink > 0.3f ? "STUCK IN QUICKSAND  ·  press R to winch out" : "QUICKSAND  ·  keep moving!");
+                _warning.AddToClassList("shown");
+            }
+            else _warning.RemoveFromClassList("shown");
 
             // Objective text and distance.
             if (runner && runner.Active != null)

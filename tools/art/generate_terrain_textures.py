@@ -6,8 +6,8 @@ Writes Assets/Terrain/Textures/<Name>_albedo.png (RGB + height in alpha) and <Na
   Mud         cracked playa mud: curled plates, deep dark cracks, secondary crazing
   Pavement    desert pavement: packed varnished pebbles in a sandy matrix
   Sandstone   neutral cross-bedded sandstone detail (tinted by the strata palette in the shaders)
-  Asphalt     weathered asphalt aggregate with cracks and sand dust
-plus Road_albedo/normal (lane markings along V) and Macro.png (large-scale variation, RGBA).
+  TrackDirt   packed track dirt with pebbles and hairline cracks (dirt track decals)
+plus Macro.png (large-scale variation, RGBA).
 """
 import math
 import os
@@ -123,6 +123,23 @@ nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
 Image.fromarray(((nrm * 0.5 + 0.5) * 255).round().astype(np.uint8), "RGB").save(os.path.join(OUT, "Sand_normal.png"))
 print("wrote Sand (photo detail)")
 
+# ---------------------------------------------------------------- Track dirt (tile = 3 m)
+# Packed, darker dirt for the tracks: the same scanned grain, tighter, with small embedded pebbles,
+# hairline cracks and a little loose sand.
+f1, edge, cid = voronoi(900, 91, jitter=1.0, warp=3.0)
+rr = np.random.default_rng(92)
+peb = smoothstep(3.2, 0.8, f1) * (rr.random(cid.max() + 1)[cid] > 0.82)
+peb_col = mix((0.30, 0.20, 0.15), (0.62, 0.46, 0.34), rr.random(cid.max() + 1)[cid])
+f1c, edgec, _ = voronoi(60, 93, warp=10.0)
+cracks = smoothstep(1.4, 0.0, edgec) * smoothstep(0.45, 0.65, band_noise(2, 8, 94))
+loose = smoothstep(0.55, 0.8, band_noise(3, 16, 95))
+base = mix((0.60, 0.40, 0.28), (0.70, 0.49, 0.35), band_noise(2, 10, 96))
+alb = base * (1 + (detail[..., None] - 1) * 0.8)
+alb = alb * (1 - loose[..., None] * 0.5) + np.array([0.80, 0.56, 0.40]) * loose[..., None] * 0.5
+alb = alb * (1 - cracks[..., None] * 0.35)
+alb = alb * (1 - peb[..., None]) + peb_col * peb[..., None]
+save("TrackDirt", alb, 0.35 * h + 0.6 * peb - 0.4 * cracks + 0.15 * loose, 6.0)
+
 # ---------------------------------------------------------------- Cracked mud (tile = 4 m)
 f1, edge, cid = voronoi(70, 11, jitter=0.9)
 f1b, edge2, _ = voronoi(420, 12, jitter=1.0)
@@ -174,38 +191,6 @@ pits = smoothstep(0.80, 0.9, holes) * smoothstep(0.4, 0.7, band_noise(2, 6, 44))
 lum = 0.66 + 0.10 * lam + 0.10 * weather + 0.08 * grain + 0.08 * blotch - 0.25 * pits - 0.30 * joints
 alb = np.stack([lum * 1.04, lum, lum * 0.95], -1)                      # nearly neutral; shaders apply colour
 save("Sandstone", alb, 0.30 * lam + 0.35 * weather + 0.15 * grain - 0.6 * pits - 0.8 * joints, 7.0)
-
-# ---------------------------------------------------------------- Asphalt (tile = 4 m)
-agg = tile_noise(0.2, 41)
-f1, edge, cid = voronoi(30, 42)
-cracks = smoothstep(1.6, 0.0, edge) * (band_noise(2, 6, 43) > 0.5)
-patches = smoothstep(0.62, 0.7, band_noise(1, 4, 44))
-dust = smoothstep(0.6, 0.95, band_noise(6, 40, 45)) * 0.6
-alb = mix((0.16, 0.16, 0.16), (0.30, 0.29, 0.28), agg) * (1 - 0.12 * patches[..., None])
-alb = alb * (1 - dust[..., None] * 0.6) + np.array([0.70, 0.52, 0.40]) * dust[..., None] * 0.6
-alb = alb * (1 - cracks[..., None] * 0.6)
-save("Asphalt", alb, 0.5 + 0.2 * agg - 0.6 * cracks, 3.0)
-
-# ---------------------------------------------------------------- Road strip: u across 8 m, v along 16 m (512 x 1024)
-W, L = 512, 1024
-u = (np.arange(W) + 0.5) / W
-v = (np.arange(L) + 0.5) / L
-uu, vv = np.meshgrid(u, v)
-asph = np.asarray(Image.open(os.path.join(OUT, "Asphalt_albedo.png")).convert("RGB")).astype(float) / 255
-road = np.tile(asph, (1, 1, 1))[:L, :W]
-wear = band_noise(1, 8, 51, size=L)[:, :W]
-centre = (np.abs(uu - 0.5 + 0.012) < 0.006) | (np.abs(uu - 0.5 - 0.012) < 0.006)   # double yellow
-edge_l = (np.abs(uu - 0.07) < 0.008)
-edge_r = (np.abs(uu - 0.93) < 0.008)
-fade = smoothstep(0.25, 0.75, wear)                                     # paint worn away in places
-yellow = np.array([0.85, 0.62, 0.12])
-white = np.array([0.80, 0.78, 0.72])
-road = np.where(centre[..., None], road * (1 - fade[..., None]) + yellow * fade[..., None], road)
-road = np.where((edge_l | edge_r)[..., None], road * (1 - 0.8 * fade[..., None]) + white * 0.8 * fade[..., None], road)
-shoulder = smoothstep(0.06, 0.0, np.minimum(uu, 1 - uu)) * (0.6 + 0.4 * wear)      # sand drifting onto the edges
-road = road * (1 - shoulder[..., None]) + np.array([0.76, 0.55, 0.40]) * shoulder[..., None]
-Image.fromarray((np.clip(road, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(OUT, "Road_albedo.png"))
-print("wrote Road")
 
 # ---------------------------------------------------------------- Macro variation (512, tile = 256 m)
 M = 512

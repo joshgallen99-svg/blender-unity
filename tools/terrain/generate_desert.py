@@ -122,10 +122,61 @@ def slope_map(hh):
 ROAD = [(566, -30), (574, 90), (556, 190), (528, 300), (532, 420), (508, 540), (474, 660), (480, 780),
         (458, 900), (452, 1060)]
 WASH = [(-20, 330), (80, 352), (170, 322), (280, 372), (390, 352), (520, 392), (610, 440), (690, 500), (760, 560)]
-road = catmull(ROAD, 4000)
+def meander(path, amp, seed):
+    """Wiggle a path sideways (dirt tracks wander around bumps and bushes)."""
+    seg = np.diff(path, axis=0, prepend=path[:1])
+    s = np.cumsum(np.hypot(seg[:, 0], seg[:, 1]))
+    t = np.gradient(path, axis=0)
+    t /= np.linalg.norm(t, axis=1, keepdims=True) + 1e-9
+    nrm = np.stack([t[:, 1], -t[:, 0]], 1)
+    r = np.random.default_rng(seed)
+    p1, p2 = r.uniform(0, 6.3, 2)
+    off = amp * (0.7 * np.sin(s / 41 + p1) + 0.3 * np.sin(s / 13.5 + p2))
+    off *= np.minimum(1, np.minimum(s, s[-1] - s) / 25)       # pinned at both ends
+    return path + nrm * off[:, None]
+
+
+def path_length(points):
+    p = np.array(points, float)
+    return float(np.sum(np.hypot(*np.diff(p, axis=0).T)))
+
+
+road = meander(catmull(ROAD, 4000), 3.0, SEED + 40)        # the main dirt track (the old wagon road)
 wash = catmull(WASH, 4000)
 d_road, i_road, road_tree = path_field(road)
 d_wash, i_wash, _ = path_field(wash)
+
+
+def snap_to_road(x, z):
+    _, k = road_tree.query([x, z])
+    return float(road[k][0]), float(road[k][1])
+
+
+# Side tracks: narrower two-rut trails branching off the main track to the landmarks. Formations are
+# pushed clear of them below, so the tracks squeeze through gaps in the rock.
+SIDE_TRACKS = {
+    "well":       [snap_to_road(532, 420), (566, 438), (600, 449), (628, 459)],
+    "wave":       [snap_to_road(508, 540), (452, 553), (385, 572), (322, 582), (266, 578)],
+    "chimneys":   [snap_to_road(538, 262), (482, 252), (410, 240), (332, 228), (262, 214), (238, 210)],
+    "needle":     [snap_to_road(480, 780), (540, 793), (600, 812), (660, 836)],
+    "rustbucket": [snap_to_road(570, 110), (628, 150), (690, 196), (752, 228), (806, 244)],
+    "playa":      [(646, 482), (684, 512), (716, 545), (744, 575)],
+}
+side_paths = {k: meander(catmull(v, int(path_length(v) / 0.3)), 1.8, SEED + 50 + i)
+              for i, (k, v) in enumerate(SIDE_TRACKS.items())}
+side_trees = {k: cKDTree(v) for k, v in side_paths.items()}
+d_side = np.full((N, N), 1e4)
+for sp in side_paths.values():
+    d_side = np.minimum(d_side, path_field(sp)[0])
+d_track = np.minimum(d_road, d_side)       # distance to any track
+
+
+# Hazards (cx, cz, rx, rz, yaw). Quicksand sits in the wash near the spring at Prospector's Well, just off
+# the tracks, so shortcuts are risky; wet mud fills the wash crossing, the spring overflow and the playa edge.
+QUICKSAND = [(596, 424, 11, 8, 30), (452, 371, 9, 7, -10), (705, 512, 8, 6, 45), (262, 356, 10, 7, 5)]
+WET_MUD = [(531, 404, 15, 9, 25), (657, 474, 16, 9, -30), (757, 584, 34, 18, -40), (300, 368, 20, 8, 10),
+           (150, 330, 18, 7, -5), (612, 441, 12, 7, 35)]
+WASHBOARD_T = [(0.29, 0.40), (0.57, 0.68)]    # stretches of the main track with corrugations
 
 WAVE = (215, 575, 125, 100)        # cx, cz, rx, rz
 PLAYA = (785, 600, 150, 108)
@@ -241,17 +292,36 @@ def footprint_r(f, x=None, z=None):
     return ellipse_r(f["x"], f["z"], rx * f["scale"], rz * f["scale"], -f["yaw"], x, z)
 
 
-# Push formations clear of the road if a footprint overlaps it.
+# Push formations clear of the main track (wide berth) and the side tracks (they may squeeze past).
 for f in formations:
-    for _ in range(40):
-        need = max(FOOT[f["model"]]) * f["scale"] * 0.75 + 12
-        if sample(d_road, f["x"], f["z"]) >= need:
+    for _ in range(60):
+        moved = False
+        reach = max(FOOT[f["model"]]) * f["scale"]
+        d, k = road_tree.query([f["x"], f["z"]])
+        if d < reach * 0.75 + 12:
+            dx, dz = f["x"] - road[k][0], f["z"] - road[k][1]
+            ln = math.hypot(dx, dz) or 1
+            f["x"] += dx / ln * 3
+            f["z"] += dz / ln * 3
+            moved = True
+        for kname, path in side_paths.items():
+            near = side_trees[kname].query_ball_point([f["x"], f["z"]], reach * 1.6 + 8)
+            if not near:
+                continue
+            pts = path[near]
+            # Real footprint shape (elliptical), with ~4 m of track clearance.
+            rx, rz = FOOT[f["model"]]
+            fr = ellipse_r(f["x"], f["z"], rx * f["scale"] + 4, rz * f["scale"] + 4, -f["yaw"], pts[:, 0], pts[:, 1])
+            j = int(np.argmin(fr))
+            if fr[j] >= 1.0:
+                continue
+            dx, dz = f["x"] - pts[j][0], f["z"] - pts[j][1]
+            ln = math.hypot(dx, dz) or 1
+            f["x"] += dx / ln * 2.5
+            f["z"] += dz / ln * 2.5
+            moved = True
+        if not moved:
             break
-        _, k = road_tree.query([f["x"], f["z"]])
-        dx, dz = f["x"] - road[k][0], f["z"] - road[k][1]
-        ln = math.hypot(dx, dz) or 1
-        f["x"] += dx / ln * 3
-        f["z"] += dz / ln * 3
 
 foot_r = np.full((N, N), 9.0)       # < 1 inside a formation footprint
 for f in formations:
@@ -312,10 +382,30 @@ h = ndimage.gaussian_filter(h, 0.6)
 carve = (1 - smoothstep(8, 26, d_wash)) * (1 - wP)
 h -= 3.5 * carve
 
+# Tracks are graded lightly: they follow the lie of the land instead of cutting a flat roadbed.
 road_h = np.array([sample(h, x, z) for x, z in road])
-road_h = ndimage.gaussian_filter1d(road_h, 60, mode="nearest")
-road_w = 1 - smoothstep(6.5, 20, d_road)
+road_h = ndimage.gaussian_filter1d(road_h, 28, mode="nearest")
+road_w = (1 - smoothstep(3.5, 12, d_road)) * 0.85
 h = h * (1 - road_w) + road_h[i_road] * road_w
+for sp in side_paths.values():
+    d_s, i_s, _ = path_field(sp)
+    sh = ndimage.gaussian_filter1d(np.array([sample(h, x, z) for x, z in sp]), 22, mode="nearest")
+    w_s = (1 - smoothstep(2.5, 9, d_s)) * 0.7
+    h = h * (1 - w_s) + sh[i_s] * w_s
+
+# Mud and quicksand lie in shallow, flat-bottomed hollows.
+haz_mud = np.zeros((N, N))
+haz_quick = np.zeros((N, N))
+for cx, cz, rx, rz, yaw in WET_MUD:
+    r = ellipse_r(cx, cz, rx, rz, yaw) * (1 + 0.18 * (fbm(9, 2, SEED + 60 + int(cx)) - 0.5))
+    haz_mud = np.maximum(haz_mud, smoothstep(1.15, 0.85, r))
+for cx, cz, rx, rz, yaw in QUICKSAND:
+    r = ellipse_r(cx, cz, rx, rz, yaw) * (1 + 0.12 * (fbm(11, 2, SEED + 70 + int(cx)) - 0.5))
+    haz_quick = np.maximum(haz_quick, smoothstep(1.1, 0.9, r))
+soft = np.maximum(haz_mud, haz_quick)
+if soft.max() > 0:
+    lowered = ndimage.uniform_filter(h, 9)
+    h = h * (1 - soft) + (lowered - 0.45) * soft
 
 
 # ---------------------------------------------------------------------------- landmarks and spawn
@@ -395,7 +485,8 @@ apron = smoothstep(1.35, 1.0, foot_r)
 mud = np.maximum(wP, (1 - smoothstep(5, 15, d_wash)) * 0.85 * (1 - wP))
 mud = np.maximum(mud, smoothstep(0.15, 0.35, curv) * smoothstep(0.6, 0.75, patch) * (1 - wD))
 pave = smoothstep(0.55, 0.72, patch) * 0.8 + near_form * 0.7 * smoothstep(0.35, 0.6, fine)
-pave = np.maximum(pave, (smoothstep(4.5, 7.0, d_road) * (1 - smoothstep(9, 14, d_road))) * 0.8)   # road shoulders
+pave = np.maximum(pave, (smoothstep(2.6, 3.6, d_road) * (1 - smoothstep(5, 8, d_road))) * 0.45)   # graded berms
+mud = np.maximum(mud, haz_mud * 0.9)
 pave *= (1 - wD) * (1 - wP)
 sand = np.clip(1.0 - mud - pave, 0.05, 1) + wD
 rgb = np.stack([sand, mud, pave], -1)
@@ -405,7 +496,7 @@ ridged = 1 - np.abs(fbm(9, 3, SEED + 22) * 2 - 1)
 outcrop = smoothstep(0.86, 0.95, ridged) * smoothstep(80, 140, d_road) * (1 - wD) * (1 - wP)
 slick = np.maximum.reduce([wW * smoothstep(0.25, 0.45, fine + 0.25), apron * 0.85,
                            plat * 0.5 * smoothstep(0.4, 0.6, fine), outcrop])
-slick *= 1 - smoothstep(14, 6, d_road)
+slick *= 1 - smoothstep(10, 4, d_track)
 
 M = 1024
 mask = np.concatenate([rgb, slick[..., None]], -1)
@@ -414,10 +505,10 @@ Image.fromarray((np.clip(mask_img[::-1], 0, 1) * 255).round().astype(np.uint8), 
 
 rock_phys = np.maximum(slick, smoothstep(0.24, 0.42, 1 - np.cos(np.radians(slope))))
 phys = np.stack([rgb[..., 0] * (1 - rock_phys), rgb[..., 2] * (1 - rock_phys), rgb[..., 1] * (1 - rock_phys), rock_phys], -1)
-on_road = 1 - smoothstep(4.5, 5.5, d_road)               # asphalt grips like gravel
-phys[..., 0] *= 1 - on_road
-phys[..., 2] *= 1 - on_road
-phys[..., 1] = np.maximum(phys[..., 1], on_road)
+on_road = np.maximum(1 - smoothstep(2.4, 3.2, d_road), 1 - smoothstep(1.7, 2.4, d_side)) * (1 - rock_phys)
+phys[..., 0] *= 1 - on_road                              # tracks are packed dirt
+phys[..., 1] *= 1 - on_road
+phys[..., 2] = np.maximum(phys[..., 2], on_road)
 phys = phys / (phys.sum(-1, keepdims=True) + 1e-6)
 S = 512
 splat = ndimage.zoom(phys, (S / N, S / N, 1), order=1)
@@ -455,7 +546,9 @@ solid = Spacing()
 def blocked(x, z, road_clear=8.0, wash_clear=5.0):
     if not (12 < x < SIZE - 12 and 12 < z < SIZE - 12):
         return True
-    if sample(d_road, x, z) < road_clear or sample(d_wash, x, z) < wash_clear:
+    if sample(d_road, x, z) < road_clear or sample(d_wash, x, z) < wash_clear or sample(d_side, x, z) < road_clear * 0.6:
+        return True
+    if sample(haz_quick, x, z) > 0.02 or (sample(haz_mud, x, z) > 0.05 and kind_hint[0] != "Grass"):
         return True
     if sample(foot_r, x, z) < 0.92:
         return True
@@ -464,7 +557,11 @@ def blocked(x, z, road_clear=8.0, wash_clear=5.0):
     return any(math.hypot(x - px, z - pz) < pr for px, pz, pr in pads)
 
 
+kind_hint = [""]
+
+
 def put(kind, variants, x, z, scale, sink, spacing=0.0, road_clear=8.0):
+    kind_hint[0] = kind
     if blocked(x, z, road_clear):
         return False
     if sample(slope, x, z) > 34 and kind not in ("Boulder", "Rock"):
@@ -509,22 +606,23 @@ for f in formations:
     if f["model"].startswith(("Mound", "Fin")):
         ring_around(f, 3, 18, int(size * 0.12), "Yucca", 2, (0.8, 1.2), 0.02, 0, 8)
 
-# Road shoulders: grass and the odd shrub, thinning out in places (like the reference photo).
+# Track verges: grass and the odd shrub, thinning out in places.
 gaps = fbm(14, 2, SEED + 30)
-for k in range(0, len(road), 3):
-    x0, z0 = road[k]
-    if not (20 < x0 < SIZE - 20 and 20 < z0 < SIZE - 20):
-        continue
-    tx, tz = road[min(k + 1, len(road) - 1)] - road[max(k - 1, 0)]
-    ln = math.hypot(tx, tz) or 1
-    for side in (-1, 1):
-        if sample(gaps, x0, z0) < 0.42 and rng.random() < 0.7:
+for path, near, far, step in [(road, 4.0, 9.0, 3)] + [(sp, 3.0, 7.0, 4) for sp in side_paths.values()]:
+    for k in range(0, len(path), step):
+        x0, z0 = path[k]
+        if not (20 < x0 < SIZE - 20 and 20 < z0 < SIZE - 20):
             continue
-        off = side * rng.uniform(6.5, 12)
-        x, z = x0 + tz / ln * off, z0 - tx / ln * off
-        put("Grass", 2, x, z, rng.uniform(0.8, 1.4), 0.03, road_clear=6.0)
-        if rng.random() < 0.18:
-            put("Scrub", 3, x + rng.normal(0, 2), z + rng.normal(0, 2), rng.uniform(0.7, 1.2), 0.05, road_clear=7.0)
+        tx, tz = path[min(k + 1, len(path) - 1)] - path[max(k - 1, 0)]
+        ln = math.hypot(tx, tz) or 1
+        for side in (-1, 1):
+            if sample(gaps, x0, z0) < 0.42 and rng.random() < 0.7:
+                continue
+            off = side * rng.uniform(near, far)
+            x, z = x0 + tz / ln * off, z0 - tx / ln * off
+            put("Grass", 2, x, z, rng.uniform(0.8, 1.4), 0.03, road_clear=near * 0.8)
+            if rng.random() < 0.14:
+                put("Scrub", 3, x + side * abs(rng.normal(0, 2)), z, rng.uniform(0.7, 1.2), 0.05, road_clear=near)
 
 # Wash banks: grass, shrubs and a few dead trees where water passes.
 for k in range(0, len(wash), 4):
@@ -616,10 +714,69 @@ print("Props:", counts, "formations:", len(formations), "markers:", len(markers)
 
 road_x = [round(float(x), 2) for x, _ in road[::6]]
 road_z = [round(float(z), 2) for _, z in road[::6]]
+
+
+def track_record(name, path, width, step):
+    pts = path[::step]
+    n = len(pts)
+    t = np.linspace(0, 1, n)
+    wash_amt = np.zeros(n)
+    if name == "main":
+        for t0, t1 in WASHBOARD_T:
+            wash_amt = np.maximum(wash_amt, smoothstep(t0, t0 + 0.02, t) * (1 - smoothstep(t1 - 0.02, t1, t)))
+    # Tracks fade out where sand has drifted over them (dunes) and at the ends of side tracks.
+    drift = np.array([sample(wD, x, z) for x, z in pts])
+    fade = np.clip(1 - smoothstep(0.35, 0.8, drift), 0, 1)
+    if name != "main":
+        s = np.linspace(0, path_length(pts), n)
+        fade *= np.clip((s[-1] - s) / 12, 0, 1)
+    return {"name": name, "width": width,
+            "x": [round(float(x), 2) for x, _ in pts], "z": [round(float(z), 2) for _, z in pts],
+            "washboard": [round(float(v), 2) for v in wash_amt], "fade": [round(float(v), 2) for v in fade]}
+
+
+for name, sp in side_paths.items():
+    worst = min(sample(foot_r, x, z) for x, z in sp[::10])
+    if worst < 1.0:
+        print(f"  WARNING: track '{name}' crosses a formation footprint (foot_r {worst:.2f})")
+tracks = [track_record("main", road, 4.6, 6)] + [track_record(k, sp, 3.4, 6) for k, sp in side_paths.items()]
+
+# Hazard map (1024, bottom-up like the masks): R wet mud, G quicksand, B washboard, A standing water.
+wb = np.zeros((N, N))
+t_road = i_road / (len(road) - 1)
+for t0, t1 in WASHBOARD_T:
+    wb = np.maximum(wb, smoothstep(t0, t0 + 0.02, t_road) * (1 - smoothstep(t1 - 0.02, t1, t_road)))
+wb *= 1 - smoothstep(2.0, 2.8, d_road)
+puddle = haz_mud * smoothstep(0.55, 0.7, fbm(14, 3, SEED + 80)) * smoothstep(0.6, 0.9, haz_mud)
+hz = np.stack([haz_mud, haz_quick, wb, puddle], -1)
+HZ = 1024
+hz_img = ndimage.zoom(hz, (HZ / N, HZ / N, 1), order=1)
+Image.fromarray((np.clip(hz_img[::-1], 0, 1) * 255).round().astype(np.uint8), "RGBA").save(os.path.join(MASKS, "desert_hazard.png"))
+
+# Warning signs beside the quicksand, and signposts where side tracks leave the main track.
+for cx, cz, rx, rz, yaw in QUICKSAND:
+    _, k = road_tree.query([cx, cz])
+    best = None
+    for sp in side_paths.values():
+        d, kk = cKDTree(sp).query([cx, cz])
+        if best is None or d < best[0]:
+            best = (d, sp[kk])
+    tx_, tz_ = best[1] if best and best[0] < sample(d_road, cx, cz) else road[k]
+    ang = math.atan2(tx_ - cx, tz_ - cz)
+    sx, sz = cx + math.sin(ang) * (max(rx, rz) + 3), cz + math.cos(ang) * (max(rx, rz) + 3)
+    markers.append(piece("Signpost", sx, sz, math.degrees(ang), 0.1))
+for name, sp in side_paths.items():
+    if name == "playa":
+        continue
+    x0, z0 = sp[min(40, len(sp) - 1)]
+    tx_, tz_ = sp[min(60, len(sp) - 1)] - sp[min(20, len(sp) - 1)]
+    ln = math.hypot(tx_, tz_) or 1
+    markers.append(piece("Signpost", x0 + tz_ / ln * 3.2, z0 - tx_ / ln * 3.2, math.degrees(math.atan2(tx_, tz_)) + 90, 0.1))
 info = {"size": SIZE, "height": HEIGHT, "resolution": N, "splatResolution": S,
         "layers": ["Sand", "Gravel", "CrackedSoil", "RedRock"],
         "spawn": {"x": round(spawn_x, 2), "z": round(spawn_z, 2), "yaw": round(spawn_heading, 1)},
-        "landmarks": landmarks, "markers": markers, "formations": formations, "roadX": road_x, "roadZ": road_z}
+        "landmarks": landmarks, "markers": markers, "formations": formations, "roadX": road_x, "roadZ": road_z,
+        "tracks": tracks}
 with open(os.path.join(SRC, "desert_info.json"), "w") as f_:
     json.dump(info, f_, indent=1)
 print("Done.")

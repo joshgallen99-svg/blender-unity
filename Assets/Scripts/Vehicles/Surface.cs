@@ -11,6 +11,9 @@ namespace Offroad.Vehicles
         public float dust;       // how much dust/spray wheels kick up (0..1)
         public Color dustColor;
         public Vector4 layers;   // surface mix: x sand, y gravel, z packed soil, w rock (zero = unknown)
+        public float mud;        // 0..1 wet mud / standing water: slippery, sticky, wheels sink a little
+        public float quicksand;  // 0..1 quicksand: wheels sink steadily unless the vehicle keeps moving
+        public float washboard;  // 0..1 corrugations: rattles the suspension, costs grip at speed
 
         public static readonly SurfaceInfo Default = new SurfaceInfo
         {
@@ -25,6 +28,9 @@ namespace Offroad.Vehicles
             dust = Mathf.Lerp(a.dust, b.dust, t),
             dustColor = Color.Lerp(a.dustColor, b.dustColor, t),
             layers = Vector4.Lerp(a.layers, b.layers, t),
+            mud = Mathf.Lerp(a.mud, b.mud, t),
+            quicksand = Mathf.Lerp(a.quicksand, b.quicksand, t),
+            washboard = Mathf.Lerp(a.washboard, b.washboard, t),
         };
     }
 
@@ -35,13 +41,16 @@ namespace Offroad.Vehicles
         public Vector4 grip;
         public float sandDrag;
         public float rolling;
+        public float mudGrip;    // grip multiplier in mud and quicksand (0 = treat as 1)
 
-        public static readonly TireProfile Neutral = new TireProfile { grip = Vector4.one, sandDrag = 1f, rolling = 1f };
+        public static readonly TireProfile Neutral = new TireProfile { grip = Vector4.one, sandDrag = 1f, rolling = 1f, mudGrip = 1f };
 
         public float GripOn(in SurfaceInfo s)
         {
             float total = s.layers.x + s.layers.y + s.layers.z + s.layers.w;
-            return total > 1e-3f ? Vector4.Dot(s.layers, grip) / total : 1f;
+            float fit = total > 1e-3f ? Vector4.Dot(s.layers, grip) / total : 1f;
+            float wet = Mathf.Clamp01(s.mud + s.quicksand);
+            return Mathf.Lerp(fit, mudGrip > 0f ? mudGrip : 1f, wet);
         }
 
         public float DragOn(in SurfaceInfo s)

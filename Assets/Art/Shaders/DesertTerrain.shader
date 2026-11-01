@@ -187,9 +187,39 @@ Shader "Offroad/DesertTerrain"
                 albedo = lerp(albedo, albedo * half3(1.12, 0.90, 0.82), smoothstep(0.45, 0.8, macroL.b) * 0.65 * ground);
                 albedo = lerp(albedo, albedo * half3(1.0, 1.03, 1.08), smoothstep(0.55, 0.85, macro.b) * 0.5 * ground);
 
+                // --- Hazards from the hazard map: wet mud, standing water, quicksand, each with a damp rim.
+                half4 hz = SAMPLE_TEXTURE2D(_OffroadHazard, sampler_OffroadHazard, i.uvFog.xy) * _OffroadHazardOn;
+                half edgeN = (macroS.g - 0.5) * 0.35 + (macro2.r - 0.5) * 0.2;
+                half mudW = smoothstep(0.35, 0.65, hz.r + edgeN) * ground;
+                half quickW = smoothstep(0.3, 0.6, hz.g + edgeN * 0.6) * ground;
+                half waterW = smoothstep(0.35, 0.6, hz.a + edgeN * 0.5) * ground;
+                half damp = saturate((hz.r + hz.g) * 2.5) * (1.0 - mudW) * (1.0 - quickW) * ground;
+                half smooth = lerp(0.06, 0.12, rb);
+                float tm = _Time.y;
+
+                albedo *= 1.0 - 0.32 * damp;
+                smooth += 0.12 * damp;
+
+                half3 mudCol = lerp(half3(0.13, 0.085, 0.06), half3(0.24, 0.16, 0.11), saturate(mud.a * 1.2));
+                albedo = lerp(albedo, mudCol * lerp(0.85, 1.1, macroS.b), mudW);
+                smooth = lerp(smooth, 0.55, mudW);
+                normalWS = normalize(lerp(normalWS, n, mudW * 0.6));
+
+                half3 qn = half3(sin(p.x * 0.9 + tm * 0.6) + sin(p.z * 1.3 - tm * 0.45), 0,
+                                 cos(p.x * 0.7 - p.z * 0.8 + tm * 0.5) * 2.0) * 0.02;
+                albedo = lerp(albedo, half3(0.50, 0.38, 0.27) * lerp(0.92, 1.06, sand.a), quickW);
+                smooth = lerp(smooth, 0.42, quickW);
+                normalWS = normalize(lerp(normalWS, normalize(n + qn), quickW));
+
+                half3 wn = half3(sin(p.x * 3.1 + tm * 1.7) + sin(p.z * 2.3 - tm * 1.3), 0,
+                                 cos(p.x * 2.7 - tm * 1.1) + cos(p.z * 3.7 + tm * 1.9)) * 0.012;
+                albedo = lerp(albedo, half3(0.035, 0.04, 0.045), waterW);
+                smooth = lerp(smooth, 0.96, waterW);
+                normalWS = normalize(lerp(normalWS, normalize(half3(0, 1, 0) + wn), waterW));
+
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = albedo;
-                s.smoothness = lerp(0.06, 0.12, rb);
+                s.smoothness = smooth;
                 s.normalTS = half3(0, 0, 1);
                 s.occlusion = lerp(0.66, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.5));
                 s.alpha = 1;
