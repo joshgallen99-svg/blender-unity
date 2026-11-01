@@ -24,6 +24,8 @@ namespace Offroad.Core
         public static bool ConfirmPressed { get; private set; }
         public static bool GaragePressed { get; private set; }
         public static bool TourPressed { get; private set; }
+        /// <summary>Menu navigation: -1 up, +1 down this frame (arrows, W/S, d-pad).</summary>
+        public static int NavVertical { get; private set; }
         public static bool UsingGamepad { get; private set; }
 
         static int _lastFrame = -1;
@@ -39,6 +41,7 @@ namespace Offroad.Core
 
             float throttle = 0, brake = 0, steer = 0;
             bool handbrake = false, reset = false, menu = false, fps = false, swap = false, any = false, confirm = false, garage = false, tour = false;
+            int nav = 0;
             Vector2 look = Vector2.zero;
             bool pad = false;
 
@@ -59,6 +62,8 @@ namespace Offroad.Core
                 confirm = kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
                 garage = kb.gKey.wasPressedThisFrame;
                 tour = kb.f9Key.wasPressedThisFrame;
+                if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame) nav = -1;
+                if (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame) nav = 1;
             }
             var mouse = Mouse.current;
             if (mouse != null) look = mouse.delta.ReadValue() * 0.1f;
@@ -81,6 +86,8 @@ namespace Offroad.Core
                 any |= gp.buttonSouth.wasPressedThisFrame || gp.startButton.wasPressedThisFrame;
                 confirm |= gp.buttonSouth.wasPressedThisFrame;
                 garage |= gp.selectButton.wasPressedThisFrame;
+                if (gp.dpad.up.wasPressedThisFrame) nav = -1;
+                if (gp.dpad.down.wasPressedThisFrame) nav = 1;
             }
 #elif ENABLE_LEGACY_INPUT_MANAGER
             if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) throttle = 1;
@@ -96,6 +103,8 @@ namespace Offroad.Core
             confirm = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
             garage = Input.GetKeyDown(KeyCode.G);
             tour = Input.GetKeyDown(KeyCode.F9);
+            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W)) nav = -1;
+            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) nav = 1;
             if (_mouseAxesOk)
             {
                 try { look = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")); }
@@ -115,6 +124,7 @@ namespace Offroad.Core
             ConfirmPressed = confirm;
             GaragePressed = garage;
             TourPressed = tour;
+            NavVertical = nav;
             UsingGamepad = pad || (UsingGamepad && look == Vector2.zero && throttle == 0 && steer == 0);
         }
     }

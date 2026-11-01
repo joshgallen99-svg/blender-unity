@@ -169,6 +169,19 @@ namespace Offroad.UI
                    ?? Array.Find(Missions.All, x => x.region == here) ?? Missions.All[0]);
         }
 
+        /// <summary>Keyboard / d-pad: select the previous or next expedition in the list.</summary>
+        public void Move(int delta)
+        {
+            var cards = new System.Collections.Generic.List<VisualElement>();
+            foreach (var c in _list.contentContainer.Children())
+                if (c.userData is MissionDef) cards.Add(c);
+            if (cards.Count == 0) return;
+            int i = cards.FindIndex(c => c.userData == _selected);
+            i = Mathf.Clamp(i + delta, 0, cards.Count - 1);
+            Select((MissionDef)cards[i].userData);
+            (_list as ScrollView)?.ScrollTo(cards[i]);
+        }
+
         void Select(MissionDef m)
         {
             _selected = m;

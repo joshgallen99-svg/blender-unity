@@ -235,6 +235,7 @@ namespace Offroad.Game
                     case FlowState.Missions: GoTitle(); break;
                 }
             }
+            if (State == FlowState.Missions && GameInput.NavVertical != 0) ui?.MoveMissionSelection(GameInput.NavVertical);
             if (GameInput.ConfirmPressed)
             {
                 if (State == FlowState.Title) GoMissions();

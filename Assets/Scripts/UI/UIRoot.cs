@@ -132,6 +132,8 @@ namespace Offroad.UI
 
         public void HidePause() => _pause?.Hide();
 
+        public void MoveMissionSelection(int delta) => _missions?.Move(delta);
+
         /// <summary>Full-screen "travelling to ..." card while the next region's scene loads.</summary>
         public void ShowLoading(string regionTitle)
         {
