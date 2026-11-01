@@ -2,11 +2,11 @@ name: Test and build WebGL
 
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!webgl-build']
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   checks: write
 
 concurrency:
@@ -70,3 +70,14 @@ jobs:
           name: WebGL
           path: build/WebGL
           retention-days: 14
+
+      - name: Publish build to webgl-build branch (for cloud playtesting)
+        if: steps.check.outputs.ok == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          cd build/WebGL/WebGL
+          git init -q -b webgl-build
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "WebGL build of ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" webgl-build
