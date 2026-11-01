@@ -63,13 +63,20 @@ def crag(seed, size):
     nx, ny = int(size[0] / bx), int(size[1] / by)
     for i in range(nx):
         for j in range(ny):
-            cx = (i + 0.5) * bx - size[0] / 2 + rng.uniform(-0.8, 0.8)
-            cy = (j + 0.5) * by - size[1] / 2 + rng.uniform(-0.8, 0.8)
+            cx = (i + 0.5) * bx - size[0] / 2 + rng.uniform(-1.2, 1.2)
+            cy = (j + 0.5) * by - size[1] / 2 + rng.uniform(-1.2, 1.2)
             edge = 1 - max(abs(cx) / (size[0] / 2), abs(cy) / (size[1] / 2))
-            h = size[2] * (0.35 + 0.65 * edge ** 0.4) * rng.uniform(0.75, 1.1)
+            h = size[2] * (0.3 + 0.7 * edge ** 0.5) * rng.uniform(0.7, 1.15)
             if h < 1.5:
                 continue
-            sd = smin(sd, rounded_box(g.x, g.y, g.z, (cx, cy, h / 2 - 1.5), (bx * 0.55, by * 0.55, h / 2 + 1.5), 1.2), 0.9)
+            # Each block slightly rotated, its top sloping and rounded off, so the crag reads as
+            # weathered jointed granite rather than stacked boxes.
+            a = rng.uniform(-0.35, 0.35)
+            xr = (g.x - cx) * math.cos(a) - (g.y - cy) * math.sin(a)
+            yr = (g.x - cx) * math.sin(a) + (g.y - cy) * math.cos(a)
+            tilt = rng.uniform(-0.25, 0.25) * xr + rng.uniform(-0.2, 0.2) * yr
+            block = rounded_box(xr, yr, g.z - tilt, (0, 0, h / 2 - 1.5), (bx * rng.uniform(0.5, 0.65), by * rng.uniform(0.5, 0.65), h / 2 + 1.5), 1.8)
+            sd = smin(sd, block, 1.6)
     sd = smax(sd, -(g.z + 3.0), 1.0)
     return g, weather(g, sd, seed, joint_spacing=5.5, joint_depth=0.9, sheet_spacing=4.5, sheet_depth=0.6, warp=0.9, knobs=0.3)
 
