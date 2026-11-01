@@ -105,11 +105,21 @@ public class VehiclePhysicsTests
         yield return Run(1f);
         _vehicle.controls = new VehicleControls { throttle = 1f };
         yield return Run(3f);
+        float v0 = _vehicle.ForwardSpeed;
+        Vector3 p0 = _vehicle.transform.position;
         _vehicle.controls = new VehicleControls { brake = 1f };
-        yield return Run(3f);
-        Debug.Log($"Speed after braking: {_vehicle.ForwardSpeed:0.00} m/s");
-        Assert.Less(_vehicle.ForwardSpeed, 1.5f);
-        Assert.Greater(_vehicle.ForwardSpeed, -1.5f, "should not shoot backwards after stopping");
+        float t = 0f;
+        while (_vehicle.ForwardSpeed > 0.5f && t < 6f)
+        {
+            yield return new WaitForFixedUpdate();
+            t += Time.fixedDeltaTime;
+        }
+        float dist = Vector3.Distance(p0, _vehicle.transform.position);
+        Debug.Log($"Braked from {v0 * 3.6f:0} km/h in {t:0.00} s over {dist:0.0} m");
+        Assert.Less(t, 3.5f, "should stop within 3.5 s");
+        // Reverse should not engage instantly after stopping.
+        yield return Run(0.15f);
+        Assert.Greater(_vehicle.ForwardSpeed, -0.6f, "short pause before reverse engages");
     }
 
     [UnityTest]

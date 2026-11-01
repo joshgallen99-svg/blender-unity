@@ -71,6 +71,8 @@ namespace Offroad.Vehicles
         public float reverseTopSpeed = 9f;
         public float brakeForce = 9000f;         // per wheel
         public float rollingResistance = 30f;    // N per m/s per wheel
+        [Tooltip("Seconds the brake must be held at a standstill before reverse engages.")]
+        public float reverseDelay = 0.3f;
 
         [Header("Tyres")]
         public float tireGrip = 1.05f;           // friction coefficient on a neutral surface
@@ -105,6 +107,7 @@ namespace Offroad.Vehicles
         static readonly RaycastHit[] Hits = new RaycastHit[16];
 
         float _steerInput;
+        float _brakeHeldAtStop;
         float _upsideDownTime;
         Vector3 _spawnPosition;
         Quaternion _spawnRotation;
@@ -182,13 +185,23 @@ namespace Offroad.Vehicles
             }
             if (controls.brake > 0.01f)
             {
-                if (ForwardSpeed > 0.8f) brakeAmount = Mathf.Max(brakeAmount, controls.brake);
+                if (ForwardSpeed > 0.8f)
+                {
+                    brakeAmount = Mathf.Max(brakeAmount, controls.brake);
+                    _brakeHeldAtStop = 0f;
+                }
                 else if (controls.throttle <= 0.01f)
                 {
-                    driveTotal = -controls.brake * TractiveForce(-ForwardSpeed, reverseTopSpeed) * 0.7f;
-                    IsReversing = true;
+                    _brakeHeldAtStop += dt;
+                    if (_brakeHeldAtStop >= reverseDelay || ForwardSpeed < -0.3f)
+                    {
+                        driveTotal = -controls.brake * TractiveForce(-ForwardSpeed, reverseTopSpeed) * 0.7f;
+                        IsReversing = true;
+                    }
+                    else brakeAmount = Mathf.Max(brakeAmount, controls.brake);
                 }
             }
+            else _brakeHeldAtStop = 0f;
             bool idle = controls.throttle <= 0.01f && controls.brake <= 0.01f;
 
             // ---- Tyre forces.

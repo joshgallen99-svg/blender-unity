@@ -80,6 +80,8 @@ def scrub(name, seed, M, dry=False):
         parts.append(C.tube(f"{name}_st{i}", (0, 0, 0), (math.cos(a) * 0.3, math.sin(a) * 0.3, 0.35), 0.03,
                             M["Bark"], 5))
     obj = C.join(parts, name)
+    for v in obj.data.vertices:          # flat base so the pivot sits on the ground
+        v.co.z = max(v.co.z, 0.0)
     C.smooth_by_angle(obj, 25)
     return obj
 
@@ -142,6 +144,8 @@ def dead_tree(name, seed, M):
     branch(Vector((0, 0, -0.1)), Vector((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 1)), rnd.uniform(1.6, 2.2),
            0.16, 0)
     obj = C.join(parts, name)
+    for v in obj.data.vertices:
+        v.co.z = max(v.co.z, 0.0)
     C.smooth_by_angle(obj, 40)
     return obj
 

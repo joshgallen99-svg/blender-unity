@@ -4,6 +4,7 @@ Conventions (match Unity after FBX export):
   * Blender units are metres, Z is up.
   * Vehicles and props face Blender -Y, which becomes Unity +Z (forward).
   * Blender +X becomes Unity -X, so a vehicle's right-hand side is Blender -X.
+  (Verified by Assets/Tests/EditMode/GeneratedAssetTests.cs after import.)
 """
 import math
 import os
@@ -264,7 +265,7 @@ def export_fbx(objs, path):
         object_types={"MESH", "EMPTY"},
         apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_UNITS",
-        axis_forward="-Z",
+        axis_forward="Z",   # with Unity's FBX import this maps Blender -Y to Unity +Z
         axis_up="Y",
         bake_space_transform=True,
         use_mesh_modifiers=True,
