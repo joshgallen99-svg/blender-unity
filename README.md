@@ -24,6 +24,8 @@ Heavy work runs in the cloud: models are generated with Blender's Python module,
 | Menus: continue / open garage | Enter / G | A / Select |
 | FPS counter | F1 | |
 | Jump to the next landmark (sightseeing / screenshots) | F9 | |
+| Photo mode: hide the HUD, orbit with A/D, tilt W/S, zoom Q/E | F2 | |
+| Expedition list: move the selection | Up / Down (W / S) | D-pad |
 
 ## How it plays
 

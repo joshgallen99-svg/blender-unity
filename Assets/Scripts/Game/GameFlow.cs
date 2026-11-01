@@ -177,6 +177,21 @@ namespace Offroad.Game
         }
 
         int _tourIndex;
+        bool _photo;
+
+        /// <summary>F2: photo mode. Hides the HUD, parks the vehicle and lets you orbit the camera.</summary>
+        void TogglePhoto()
+        {
+            _photo = !_photo;
+            PlayerVehicleController.InputBlocked = _photo;
+            if (cam)
+            {
+                cam.ManualOrbit = _photo;
+                cam.SetShowcase(_photo, 0f, 9f);
+                if (!_photo) cam.SnapBehindTarget();
+            }
+            ui?.SetHudVisible(!_photo);
+        }
 
         /// <summary>F9: jump to the next landmark (handy for screenshots and getting your bearings).</summary>
         void TourNextLandmark()
@@ -236,6 +251,13 @@ namespace Offroad.Game
                 }
             }
             if (State == FlowState.Missions && GameInput.NavVertical != 0) ui?.MoveMissionSelection(GameInput.NavVertical);
+            if (GameInput.PhotoPressed && (State == FlowState.Driving || _photo)) TogglePhoto();
+            if (_photo && cam)
+            {
+                // A/D orbit, W/S tilt, Q/E zoom (real time, works while the world is frozen).
+                float dt = Time.unscaledDeltaTime;
+                cam.NudgeOrbit(GameInput.Steer * 70f * dt, (GameInput.Throttle - GameInput.Brake) * 35f * dt, GameInput.Zoom * 8f * dt);
+            }
             if (GameInput.ConfirmPressed)
             {
                 if (State == FlowState.Title) GoMissions();

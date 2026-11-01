@@ -40,6 +40,16 @@ namespace Offroad.CameraRig
         float _showcaseBlend, _showcaseOffset, _showcaseDistance = 8f, _showcaseYaw = 150f;
 
         /// <summary>Slow orbit around the vehicle. offset shifts the vehicle sideways on screen (+ = right).</summary>
+        /// <summary>Photo mode: hand-steered orbit (no auto-spin).</summary>
+        public bool ManualOrbit { get; set; }
+
+        public void NudgeOrbit(float yawDeg, float pitchDeg, float distanceDelta)
+        {
+            _showcaseYaw += yawDeg;
+            showcasePitch = Mathf.Clamp(showcasePitch + pitchDeg, -5f, 70f);
+            _showcaseDistance = Mathf.Clamp(_showcaseDistance + distanceDelta, 4f, 40f);
+        }
+
         public void SetShowcase(bool on, float screenOffset, float orbitDistance)
         {
             _showcase = on;
@@ -160,7 +170,7 @@ namespace Offroad.CameraRig
 
         void ShowcasePose(float dt, out Vector3 pos, out Quaternion rot)
         {
-            _showcaseYaw += showcaseYawSpeed * dt;
+            if (!ManualOrbit) _showcaseYaw += showcaseYawSpeed * dt;
             float yaw = target.transform.eulerAngles.y + _showcaseYaw;
             rot = Quaternion.Euler(showcasePitch, yaw, 0f);
             Vector3 pivot = target.transform.position + Vector3.up * showcaseHeight;

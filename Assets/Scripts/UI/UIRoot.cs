@@ -134,6 +134,14 @@ namespace Offroad.UI
 
         public void MoveMissionSelection(int delta) => _missions?.Move(delta);
 
+        /// <summary>Photo mode hides the HUD and toasts.</summary>
+        public void SetHudVisible(bool visible)
+        {
+            if (!EnsureBuilt()) return;
+            _hud.Root.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
+            _toasts.Root.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
+        }
+
         /// <summary>Full-screen "travelling to ..." card while the next region's scene loads.</summary>
         public void ShowLoading(string regionTitle)
         {
