@@ -187,8 +187,9 @@ namespace Offroad.Game
             if (cam)
             {
                 cam.ManualOrbit = _photo;
-                cam.SetShowcase(_photo, 0f, 9f);
-                if (!_photo) cam.SnapBehindTarget();
+                cam.SetShowcase(_photo, 0f, 11f);
+                if (_photo) cam.BeginPhotoOrbit();
+                else { cam.EndPhotoOrbit(); cam.SnapBehindTarget(); }
             }
             ui?.SetHudVisible(!_photo);
         }

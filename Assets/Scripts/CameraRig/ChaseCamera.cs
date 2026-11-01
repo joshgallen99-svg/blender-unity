@@ -43,6 +43,23 @@ namespace Offroad.CameraRig
         /// <summary>Photo mode: hand-steered orbit (no auto-spin).</summary>
         public bool ManualOrbit { get; set; }
 
+        float _menuPitch = -1f;
+
+        /// <summary>Photo mode starts low and behind the vehicle, looking where it faces (e.g. a landmark).</summary>
+        public void BeginPhotoOrbit()
+        {
+            if (_menuPitch < 0f) _menuPitch = showcasePitch;
+            _showcaseYaw = 28f;
+            showcasePitch = 6f;
+            _showcaseDistance = 11f;
+            _showcaseOffset = 0f;
+        }
+
+        public void EndPhotoOrbit()
+        {
+            if (_menuPitch >= 0f) showcasePitch = _menuPitch;
+        }
+
         public void NudgeOrbit(float yawDeg, float pitchDeg, float distanceDelta)
         {
             _showcaseYaw += yawDeg;
