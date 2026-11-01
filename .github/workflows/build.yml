@@ -101,9 +101,12 @@ jobs:
             cd /opt/unity/Editor/Data
             find Managed NetStandard MonoBleedingEdge/lib/mono/4.7.1-api -name "*.dll" -size -90M | tar -cf - -T - | tar -xf - -C /out'
           sudo cp Library/ScriptAssemblies/*.dll "$OUT/ScriptAssemblies/" || true
-          sudo cp -r Library/PackageCache/. "$OUT/PackageCache/"
-          sudo find "$OUT/PackageCache" -type f \( -name "*.png" -o -name "*.psd" -o -name "*.tga" -o -name "*.exr" -o -name "*.hdr" -o -name "*.fbx" -o -name "*.asset" -o -name "*.mat" \) -delete
-          sudo find "$OUT/PackageCache" -type d \( -name "Documentation~" -o -name "Samples~" -o -name "Tests" \) -prune -exec rm -rf {} +
+          cd Library/PackageCache
+          for d in com.unity.render-pipelines.* com.unity.inputsystem* com.unity.test-framework* com.unity.ext.nunit* com.unity.ugui* com.unity.mathematics*; do
+            [ -d "$d" ] || continue
+            sudo find "$d" -type f \( -name "*.cs" -o -name "*.asmdef" -o -name "package.json" -o -name "*.dll" \) -size -20M -print0 | sudo xargs -0 -I{} cp --parents {} "$OUT/PackageCache/"
+          done
+          cd - > /dev/null
           mkdir -p "$OUT/ProjectSettings" && sudo cp ProjectSettings/*.asset "$OUT/ProjectSettings/" || true
           sudo chown -R "$(id -u)" "$OUT"
           du -sh "$OUT"/*
