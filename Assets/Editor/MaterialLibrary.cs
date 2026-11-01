@@ -216,6 +216,9 @@ namespace Offroad.EditorTools
             var m = LoadOrCreate($"{Dir}/Water.mat", "Offroad/Water");
             m.SetTexture("_NormalTex", Tex("Water_normal"));
             m.SetTexture("_FoamTex", Tex("Foam_albedo"));
+            m.SetColor("_ShallowColor", new Color(0.26f, 0.31f, 0.21f));
+            m.SetColor("_DeepColor", new Color(0.03f, 0.08f, 0.07f));
+            m.SetFloat("_Clarity", 0.75f);
             m.renderQueue = 2990;
             EditorUtility.SetDirty(m);
             return m;

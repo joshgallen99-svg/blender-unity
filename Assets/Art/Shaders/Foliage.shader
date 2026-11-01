@@ -7,6 +7,7 @@ Shader "Offroad/Foliage"
         [MainTexture] _BaseMap ("Leaves (RGBA)", 2D) = "white" {}
         [MainColor] _BaseColor ("Tint", Color) = (1, 1, 1, 1)
         _Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.45
+        _NearFade ("Fade Out Within (m) of the Camera", Float) = 2.2
         _WindStrength ("Wind Strength", Range(0, 0.5)) = 0.08
         _WindSpeed ("Wind Speed", Float) = 1.6
         _WindHeight ("Height for Full Sway (m)", Float) = 1.2
@@ -26,6 +27,7 @@ Shader "Offroad/Foliage"
             float4 _BaseMap_ST;
             half4 _BaseColor;
             half _Cutoff;
+            float _NearFade;
             float _WindStrength;
             float _WindSpeed;
             float _WindHeight;
@@ -99,6 +101,10 @@ Shader "Offroad/Foliage"
                 UNITY_SETUP_INSTANCE_ID(i);
                 half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uvFog.xy) * _BaseColor;
                 clip(tex.a - _Cutoff);
+                // Dissolve leaves right in front of the camera (dithered), so branches never fill the screen.
+                float camDist = distance(i.positionWS, _WorldSpaceCameraPos);
+                float dither = frac(52.9829189 * frac(dot(i.positionCS.xy, float2(0.06711056, 0.00583715))));
+                clip(saturate((camDist - _NearFade) / 2.5) - dither);
 
                 half3 n = normalize(i.normalWS);   // mesh normals are bent outward from the plant centre
                 InputData d = (InputData)0;

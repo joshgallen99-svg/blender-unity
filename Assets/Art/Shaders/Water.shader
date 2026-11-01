@@ -118,13 +118,13 @@ Shader "Offroad/Water"
                 half foam = saturate((foamTex * 0.7 + foamTex2 * 0.5) * foamAmt * 1.6);
 
                 half3 viewWS = GetWorldSpaceNormalizeViewDir(p);
-                half fresnel = pow(1.0 - saturate(dot(normalWS, viewWS)), 4.0) * 0.9 + 0.04;
-                half alpha = saturate(max(absorb, fresnel * 0.85) + foam);
+                half fresnel = pow(1.0 - saturate(dot(normalWS, viewWS)), 5.0) * 0.9 + 0.03;
+                half alpha = saturate(max(absorb, fresnel * 0.55) + foam);
                 alpha *= saturate(depth * 12.0 + fall);                     // feather the shoreline
 
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = lerp(waterCol, half3(0.85, 0.88, 0.88), foam);
-                s.smoothness = lerp(0.93, 0.35, foam);
+                s.smoothness = lerp(0.86, 0.35, foam);
                 s.normalTS = half3(0, 0, 1);
                 s.occlusion = 1;
                 s.alpha = alpha;

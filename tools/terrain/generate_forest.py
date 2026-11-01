@@ -332,7 +332,7 @@ MUD_HOLES = []
 for path in [main] + list(side_paths.values()):
     for k in range(200, len(path) - 200, 260):
         x, z = path[k]
-        if sample(d_river, x, z) < 30 or rng.random() < 0.55:
+        if sample(d_river, x, z) < 30 or sample(slope0, x, z) > 7 or rng.random() < 0.45:
             continue
         a = math.degrees(math.atan2(*(path[k + 5] - path[k - 5])))
         MUD_HOLES.append((float(x), float(z), rng.uniform(5, 9), rng.uniform(3.5, 6), -a))
@@ -514,6 +514,7 @@ def put(kind, variants, x, z, scale, sink, spacing=0.0, track_clear=6.0, max_slo
 forest = (1 - meadow) * smoothstep(40, 12, slope) * smoothstep(22, 45, d_river) * (1 - smoothstep(170, 215, h))
 forest *= 0.55 + 0.45 * smoothstep(0.3, 0.6, fbm(7, 3, SEED + 90))
 forest *= smoothstep(1.4, 2.2, foot_r)
+forest *= 0.25 + 0.75 * smoothstep(9, 24, d_track)          # logging roads run through cleared corridors
 fw = (forest / forest.sum()).ravel()
 cells = rng.choice(N * N, size=16000, replace=True, p=fw)
 trees = 0
@@ -523,7 +524,7 @@ for c in cells:
     hh = sample(h, x, z)
     kind = "Snag" if rng.random() < 0.03 else "Fir"
     sc = rng.uniform(0.75, 1.25) * (1.1 - 0.3 * smoothstep(120, 200, hh))
-    if put(kind, 3 if kind == "Fir" else 1, x, z, sc, 0.3, 4.2, 5.0):
+    if put(kind, 3 if kind == "Fir" else 1, x, z, sc, 0.3, 4.2, 8.5):
         trees += 1
 # Aspen groves at meadow edges and along the river.
 grove = smoothstep(0.2, 0.5, meadow) * (1 - smoothstep(0.6, 0.95, meadow)) + smoothstep(70, 30, d_river) * 0.4
@@ -535,7 +536,7 @@ for c in rng.choice(N * N, size=60, replace=False, p=gw):
     for _ in range(int(rng.integers(5, 14))):
         r = abs(rng.normal(0, 9))
         a = rng.uniform(0, 2 * math.pi)
-        put("Aspen", 2, cx + math.cos(a) * r, cz + math.sin(a) * r, rng.uniform(0.8, 1.2), 0.2, 3.0, 5.0)
+        put("Aspen", 2, cx + math.cos(a) * r, cz + math.sin(a) * r, rng.uniform(0.8, 1.2), 0.2, 3.0, 7.0)
 # Understorey: ferns and bushes under the trees, logs and stumps on the forest floor.
 for c in rng.choice(N * N, size=14000, replace=True, p=fw):
     zi, xi = divmod(int(c), N)
