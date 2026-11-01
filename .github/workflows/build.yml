@@ -74,7 +74,11 @@ jobs:
       - name: Publish build to webgl-build branch (for cloud playtesting)
         if: steps.check.outputs.ok == 'true' && github.ref == 'refs/heads/main'
         run: |
-          cd build/WebGL/WebGL
+          INDEX=$(sudo find build -name index.html | head -1)
+          echo "Found build at: $INDEX"
+          OUT="$RUNNER_TEMP/webgl"
+          mkdir -p "$OUT" && sudo cp -r "$(dirname "$INDEX")"/. "$OUT"/ && sudo chown -R "$(id -u)" "$OUT"
+          cd "$OUT"
           git init -q -b webgl-build
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
