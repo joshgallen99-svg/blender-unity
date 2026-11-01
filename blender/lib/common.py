@@ -2,8 +2,10 @@
 
 Conventions (match Unity after FBX export):
   * Blender units are metres, Z is up.
-  * Vehicles and props face Blender -Y, which becomes Unity +Z (forward).
-  * Blender +X becomes Unity -X, so a vehicle's right-hand side is Blender -X.
+  * Models are built facing Blender -Y (Blender's "front" view), vehicle left = Blender +X.
+  * Unity's FBX import maps Blender +Y to Unity +Z and Blender +X to Unity +X, so
+    export_fbx() turns everything 180 degrees about Z first: the front ends up at Unity +Z
+    and the vehicle's left at Unity -X.
   (Verified by Assets/Tests/EditMode/GeneratedAssetTests.cs after import.)
 """
 import math
@@ -255,6 +257,13 @@ def tri_count(obj):
 # ---------------------------------------------------------------- export
 
 def export_fbx(objs, path):
+    # Face Unity +Z (see module docstring). Mesh data and empty positions are rotated in place.
+    turn = Matrix.Rotation(math.pi, 4, "Z")
+    for o in objs:
+        if o.type == "MESH":
+            o.data.transform(turn)
+            o.data.update()
+        o.location = turn @ o.location
     bpy.ops.object.select_all(action="DESELECT")
     for o in objs:
         o.select_set(True)
@@ -265,7 +274,7 @@ def export_fbx(objs, path):
         object_types={"MESH", "EMPTY"},
         apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_UNITS",
-        axis_forward="Z",   # with Unity's FBX import this maps Blender -Y to Unity +Z
+        axis_forward="-Z",
         axis_up="Y",
         bake_space_transform=True,
         use_mesh_modifiers=True,
