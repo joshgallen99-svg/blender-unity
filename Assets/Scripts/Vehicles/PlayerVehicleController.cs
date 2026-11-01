@@ -10,12 +10,20 @@ namespace Offroad.Vehicles
     {
         OffroadVehicle _vehicle;
 
+        /// <summary>Set by game flow (menus, garage, wheel swap) to stop the player driving.</summary>
+        public static bool InputBlocked;
+
         void Awake() => _vehicle = GetComponent<OffroadVehicle>();
 
         void Update()
         {
             GameInput.Poll();
             if (Time.timeScale <= 0f) return;
+            if (InputBlocked)
+            {
+                _vehicle.controls = new VehicleControls { handbrake = true };
+                return;
+            }
             _vehicle.controls = new VehicleControls
             {
                 throttle = GameInput.Throttle,

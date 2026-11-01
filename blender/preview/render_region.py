@@ -19,7 +19,8 @@ import numpy as np  # noqa: E402
 from mathutils import Euler, Vector  # noqa: E402
 
 import desert_props as DP  # noqa: E402
-import ridgeback as RB  # noqa: E402
+import fleet as RB  # noqa: E402
+from lib import wheel as W  # noqa: E402
 from lib import common as C  # noqa: E402
 
 out = sys.argv[1]
@@ -51,8 +52,9 @@ props = {o.name: o for o in DP.build()}
 for o in props.values():
     o.hide_render = True
     o.hide_viewport = True
-body, wheel, empties = RB.build_body(RB.palette()), None, None
-wheel = RB.W.build("Wheel", RB.WHEEL_R, RB.WHEEL_W, mats=RB.palette())
+_M = RB.palette()
+body = RB.build_body(_M, "Ridgeback", RB.BODIES["Ridgeback"])
+wheel = W.build("Wheel", RB.WHEEL_R, RB.WHEEL_W, mats=_M)
 wheel.hide_render = True
 
 # Terrain mesh: a window around the spawn, coloured from the splat map.
@@ -121,7 +123,8 @@ pos_u = Vector((sp["x"], height(sp["x"], sp["z"]), sp["z"]))
 veh_rot = Euler((0, 0, -yaw))   # model faces Blender -Y; Unity +Z maps to Blender -Y here
 body.location = to_b(*pos_u)
 body.rotation_euler = veh_rot
-for name, sx_, y in (("FL", 1, RB.FRONT_Y), ("FR", -1, RB.FRONT_Y), ("RL", 1, RB.REAR_Y), ("RR", -1, RB.REAR_Y)):
+_S = RB.BODIES["Ridgeback"]
+for name, sx_, y in (("FL", 1, _S["front_axle"]), ("FR", -1, _S["front_axle"]), ("RL", 1, _S["rear_axle"]), ("RR", -1, _S["rear_axle"])):
     w = bpy.data.objects.new("W" + name, wheel.data)
     bpy.context.scene.collection.objects.link(w)
     w.parent = body

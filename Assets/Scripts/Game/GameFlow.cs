@@ -1,0 +1,200 @@
+using Offroad.CameraRig;
+using Offroad.Core;
+using Offroad.Garage;
+using Offroad.Settings;
+using Offroad.UI;
+using Offroad.Vehicles;
+using UnityEngine;
+
+namespace Offroad.Game
+{
+    public enum FlowState { Title, Missions, Garage, Driving, Paused, Results }
+
+    /// <summary>Top-level game states: title, expedition select, garage, driving, pause, results.</summary>
+    [DefaultExecutionOrder(-100)]
+    public class GameFlow : MonoBehaviour
+    {
+        public OffroadVehicle vehicle;
+        public ChaseCamera cam;
+        public MissionRunner runner;
+        public UIRoot ui;
+
+        public FlowState State { get; private set; } = FlowState.Title;
+        public static GameFlow Instance { get; private set; }
+        public VehicleAssembler Assembler { get; private set; }
+
+        Vector3 _spawnPos;
+        Quaternion _spawnRot;
+
+        void Awake()
+        {
+            Instance = this;
+            Assembler = vehicle ? vehicle.GetComponent<VehicleAssembler>() : null;
+            _spawnPos = vehicle.transform.position;
+            _spawnRot = vehicle.transform.rotation;
+        }
+
+        void Start()
+        {
+            GameSettings.Apply();
+            ApplyLoadout();
+            Loadout.Changed += OnLoadoutChanged;
+            if (runner) runner.Completed += OnMissionCompleted;
+            GoTitle();
+        }
+
+        void OnDestroy()
+        {
+            Loadout.Changed -= OnLoadoutChanged;
+            if (Instance == this) Instance = null;
+        }
+
+        void OnLoadoutChanged(Loadout l)
+        {
+            if (State == FlowState.Garage || State == FlowState.Title || State == FlowState.Missions) ApplyLoadout();
+        }
+
+        void ApplyLoadout()
+        {
+            if (!Assembler) return;
+            Assembler.Apply(Loadout.Current);
+            if (cam)
+            {
+                cam.distance = Assembler.CameraDistance;
+                cam.distanceAtSpeed = Assembler.CameraDistance + 1.4f;
+            }
+        }
+
+        // ------------------------------------------------------------------ transitions
+
+        public void GoTitle()
+        {
+            State = FlowState.Title;
+            Time.timeScale = 1f;
+            runner?.Abandon();
+            ResetVehicle();
+            cam?.SetShowcase(true, 0.22f, 8.5f);
+            ui?.ShowTitle();
+            SetCursor(false);
+        }
+
+        public void GoMissions()
+        {
+            State = FlowState.Missions;
+            cam?.SetShowcase(true, -0.2f, 8.5f);
+            ui?.ShowMissions();
+        }
+
+        public void GoGarage()
+        {
+            State = FlowState.Garage;
+            ResetVehicle();
+            cam?.SetShowcase(true, -0.22f, 7.2f);
+            ui?.ShowGarage();
+        }
+
+        public void StartMission(MissionDef m)
+        {
+            ApplyLoadout();
+            ResetVehicle();
+            State = FlowState.Driving;
+            Time.timeScale = 1f;
+            runner?.Begin(m);
+            cam?.SetShowcase(false, 0f, 0f);
+            cam?.SnapBehindTarget();
+            ui?.ShowHud(m);
+            SetCursor(true);
+        }
+
+        public void ContinueExploring()
+        {
+            State = FlowState.Driving;
+            runner?.Begin(Missions.Find("roam"));
+            ui?.ShowHud(runner?.Active);
+            SetCursor(true);
+        }
+
+        public void Pause()
+        {
+            if (State != FlowState.Driving) return;
+            State = FlowState.Paused;
+            Time.timeScale = 0f;
+            AudioListener.pause = true;
+            ui?.ShowPause();
+            SetCursor(false);
+        }
+
+        public void Resume()
+        {
+            if (State != FlowState.Paused) return;
+            State = FlowState.Driving;
+            Time.timeScale = 1f;
+            AudioListener.pause = false;
+            ui?.HidePause();
+            SetCursor(true);
+        }
+
+        public void AbandonMission()
+        {
+            AudioListener.pause = false;
+            GoTitle();
+        }
+
+        public void ResetVehicleUpright()
+        {
+            vehicle.ResetUpright();
+            Resume();
+        }
+
+        public void Quit()
+        {
+            Application.Quit();
+        }
+
+        void OnMissionCompleted(MissionDef m)
+        {
+            if (m.freeRoam) return;
+            State = FlowState.Results;
+            ui?.ShowResults(m);
+            SetCursor(false);
+        }
+
+        void ResetVehicle()
+        {
+            if (vehicle) vehicle.Teleport(_spawnPos, _spawnRot);
+        }
+
+        static void SetCursor(bool locked)
+        {
+            if (Application.isEditor && !Application.isFocused) return;
+            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+            Cursor.visible = !locked;
+        }
+
+        void Update()
+        {
+            GameInput.Poll();
+            if (GameInput.MenuPressed)
+            {
+                switch (State)
+                {
+                    case FlowState.Driving: Pause(); break;
+                    case FlowState.Paused: Resume(); break;
+                    case FlowState.Garage:
+                    case FlowState.Missions: GoTitle(); break;
+                }
+            }
+            if (GameInput.ConfirmPressed)
+            {
+                if (State == FlowState.Title) GoMissions();
+                else if (State == FlowState.Missions && ui && ui.SelectedMission != null) StartMission(ui.SelectedMission);
+                else if (State == FlowState.Results) GoTitle();
+            }
+            if (GameInput.GaragePressed && (State == FlowState.Title || State == FlowState.Missions)) GoGarage();
+            if (GameInput.FpsTogglePressed) GameSettings.Modify(s => s.showFps = !s.showFps);
+            PlayerVehicleController.InputBlocked = State != FlowState.Driving || (runner && runner.Swapping);
+            if (cam) cam.InputEnabled = State == FlowState.Driving;
+            if (State == FlowState.Driving && Cursor.lockState != CursorLockMode.Locked && GameInput.AnyPressed) SetCursor(true);
+        }
+    }
+}

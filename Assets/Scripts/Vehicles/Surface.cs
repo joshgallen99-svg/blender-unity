@@ -10,6 +10,7 @@ namespace Offroad.Vehicles
         public float drag;       // extra rolling drag (sand, mud)
         public float dust;       // how much dust/spray wheels kick up (0..1)
         public Color dustColor;
+        public Vector4 layers;   // surface mix: x sand, y gravel, z packed soil, w rock (zero = unknown)
 
         public static readonly SurfaceInfo Default = new SurfaceInfo
         {
@@ -23,7 +24,32 @@ namespace Offroad.Vehicles
             drag = Mathf.Lerp(a.drag, b.drag, t),
             dust = Mathf.Lerp(a.dust, b.dust, t),
             dustColor = Color.Lerp(a.dustColor, b.dustColor, t),
+            layers = Vector4.Lerp(a.layers, b.layers, t),
         };
+    }
+
+    /// <summary>How a tyre behaves on each surface (x sand, y gravel, z soil, w rock).</summary>
+    [System.Serializable]
+    public struct TireProfile
+    {
+        public Vector4 grip;
+        public float sandDrag;
+        public float rolling;
+
+        public static readonly TireProfile Neutral = new TireProfile { grip = Vector4.one, sandDrag = 1f, rolling = 1f };
+
+        public float GripOn(in SurfaceInfo s)
+        {
+            float total = s.layers.x + s.layers.y + s.layers.z + s.layers.w;
+            return total > 1e-3f ? Vector4.Dot(s.layers, grip) / total : 1f;
+        }
+
+        public float DragOn(in SurfaceInfo s)
+        {
+            float total = s.layers.x + s.layers.y + s.layers.z + s.layers.w;
+            float sand = total > 1e-3f ? s.layers.x / total : 0f;
+            return Mathf.Lerp(1f, sandDrag, sand);
+        }
     }
 
     /// <summary>Anything that can tell a wheel what it is driving on.</summary>

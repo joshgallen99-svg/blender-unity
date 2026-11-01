@@ -69,6 +69,7 @@ namespace Offroad.World
                 s.drag += l.drag * wgt;
                 s.dust += l.dust * wgt;
                 s.dustColor += l.dustColor * wgt;
+                s.layers[i] = wgt;
                 total += wgt;
             }
             if (total <= 1e-4f) return SurfaceInfo.Default;
@@ -81,7 +82,8 @@ namespace Offroad.World
 
         static SurfaceInfo ToInfo(in LayerSurface l) => new SurfaceInfo
         {
-            grip = l.grip, traction = l.traction, drag = l.drag, dust = l.dust, dustColor = l.dustColor
+            grip = l.grip, traction = l.traction, drag = l.drag, dust = l.dust, dustColor = l.dustColor,
+            layers = new Vector4(0f, 0f, 0f, 1f),   // props are rock
         };
     }
 }

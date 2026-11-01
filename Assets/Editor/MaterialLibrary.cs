@@ -57,8 +57,8 @@ namespace Offroad.EditorTools
         // Materials that use the project's custom shaders instead of URP Lit.
         static readonly Dictionary<string, System.Func<Material>> Custom = new Dictionary<string, System.Func<Material>>
         {
-            ["RockSandstone"] = () => Rock("RockSandstone", new Color(1.08f, 1.02f, 0.98f), 0.35f),
-            ["RockPale"] = () => Rock("RockPale", new Color(1.55f, 1.38f, 1.2f), 0.22f),
+            ["RockSandstone"] = () => Rock("RockSandstone", new Color(0.98f, 0.92f, 0.9f), 0.35f),
+            ["RockPale"] = () => Rock("RockPale", new Color(1.35f, 1.22f, 1.1f), 0.22f),
             ["Leaves"] = () => Foliage("Leaves", "ScrubLeaves", 0.07f, 1.4f),
             ["LeavesFlowering"] = () => Foliage("LeavesFlowering", "ScrubFlowering", 0.07f, 1.3f),
             ["GrassCards"] = () => Foliage("GrassCards", "DryGrass", 0.14f, 0.7f),

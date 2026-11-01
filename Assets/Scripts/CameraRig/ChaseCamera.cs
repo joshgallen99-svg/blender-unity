@@ -31,6 +31,25 @@ namespace Offroad.CameraRig
 
         public bool InputEnabled { get; set; } = true;
 
+        [Header("Showcase (menus and garage)")]
+        public float showcaseYawSpeed = 7f;
+        public float showcaseHeight = 1.0f;
+        public float showcasePitch = 9f;
+
+        bool _showcase;
+        float _showcaseBlend, _showcaseOffset, _showcaseDistance = 8f, _showcaseYaw = 150f;
+
+        /// <summary>Slow orbit around the vehicle. offset shifts the vehicle sideways on screen (+ = right).</summary>
+        public void SetShowcase(bool on, float screenOffset, float orbitDistance)
+        {
+            _showcase = on;
+            if (on)
+            {
+                _showcaseOffset = screenOffset;
+                _showcaseDistance = orbitDistance;
+            }
+        }
+
         void Awake()
         {
             _cam = GetComponent<Camera>();
@@ -53,6 +72,15 @@ namespace Offroad.CameraRig
             if (!target) return;
             float dt = Time.unscaledDeltaTime;
             if (!_initialised) { SnapBehindTarget(); return; }
+
+            _showcaseBlend = Mathf.MoveTowards(_showcaseBlend, _showcase ? 1f : 0f, dt * 1.2f);
+            if (_showcaseBlend > 0.999f)
+            {
+                ShowcasePose(dt, out var sp, out var sr);
+                transform.SetPositionAndRotation(sp, sr);
+                if (_cam) _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, 42f, 1f - Mathf.Exp(-3f * dt));
+                return;
+            }
 
             Transform t = target.transform;
             Vector3 vel = target.linearVelocity;
@@ -103,12 +131,32 @@ namespace Offroad.CameraRig
                 : Mathf.Lerp(_currentDistance, allowed, 1f - Mathf.Exp(-3f * dt));
 
             Vector3 pos = pivot + rot * Vector3.back * _currentDistance;
+            Quaternion lookRot = Quaternion.LookRotation(pivot + fwd * 1.5f - pos, Vector3.up);
+            if (_showcaseBlend > 0.001f)
+            {
+                // Ease between the chase view and the menu orbit.
+                ShowcasePose(dt, out var sp, out var sr);
+                float k = _showcaseBlend * _showcaseBlend * (3f - 2f * _showcaseBlend);
+                pos = Vector3.Lerp(pos, sp, k);
+                lookRot = Quaternion.Slerp(lookRot, sr, k);
+            }
             transform.position = pos;
-            transform.rotation = Quaternion.LookRotation(pivot + fwd * 1.5f - pos, Vector3.up);
+            transform.rotation = lookRot;
 
             if (_cam)
-                _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, baseFov + speedFov * speedT * speedT,
+                _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, Mathf.Lerp(baseFov + speedFov * speedT * speedT, 42f, _showcaseBlend),
                     1f - Mathf.Exp(-2f * dt));
+        }
+
+        void ShowcasePose(float dt, out Vector3 pos, out Quaternion rot)
+        {
+            _showcaseYaw += showcaseYawSpeed * dt;
+            float yaw = target.transform.eulerAngles.y + _showcaseYaw;
+            rot = Quaternion.Euler(showcasePitch, yaw, 0f);
+            Vector3 pivot = target.transform.position + Vector3.up * showcaseHeight;
+            pos = pivot - rot * Vector3.forward * _showcaseDistance;
+            // Slide the camera sideways so the vehicle sits to one side of the UI.
+            pos -= rot * Vector3.right * (_showcaseOffset * _showcaseDistance);
         }
     }
 }

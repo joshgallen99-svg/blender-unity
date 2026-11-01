@@ -162,6 +162,42 @@ public class VehiclePhysicsTests
         Assert.Greater(climbed, 10f, "should climb a 24 degree slope");
     }
 
+    /// <summary>Pretends the whole world is one surface type.</summary>
+    class UniformSurface : MonoBehaviour, ISurfaceProvider
+    {
+        public SurfaceInfo info;
+        public SurfaceInfo GetSurface(Vector3 p, Collider c) => info;
+    }
+
+    IEnumerator SpeedOn(Vector4 layers, float drag, string tireId, System.Action<float> result)
+    {
+        MakeGround();
+        var surf = _ground.AddComponent<UniformSurface>();
+        surf.info = new SurfaceInfo { grip = 0.9f, traction = 0.85f, drag = drag, dust = 0f, layers = layers };
+        MakeVehicle();
+        _vehicle.surfaceProvider = surf;
+        var t = Offroad.Garage.Catalog.Tire(tireId);
+        _vehicle.tire = new TireProfile { grip = t.grip, sandDrag = t.sandDrag, rolling = t.rolling };
+        yield return Run(1f);
+        _vehicle.controls = new VehicleControls { throttle = 1f };
+        yield return Run(5f);
+        result(_vehicle.ForwardSpeed);
+        Object.Destroy(_vehicle.gameObject);
+        Object.Destroy(_ground);
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator DuneTyresBeatCrawlersOnSand()
+    {
+        float dune = 0, mt = 0;
+        var sand = new Vector4(1, 0, 0, 0);
+        yield return SpeedOn(sand, 0.55f, "dune", v => dune = v);
+        yield return SpeedOn(sand, 0.55f, "mt", v => mt = v);
+        Debug.Log($"Sand after 5 s: dune {dune * 3.6f:0} km/h, crawler {mt * 3.6f:0} km/h");
+        Assert.Greater(dune, mt * 1.15f, "dune tyres should be clearly faster in soft sand");
+    }
+
     [UnityTest]
     public IEnumerator RightsItselfWhenUpsideDown()
     {

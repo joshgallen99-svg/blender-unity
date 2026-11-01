@@ -1,0 +1,185 @@
+/* Offroad Expedition: "field kit" UI. Dark translucent panels, condensed uppercase type, orange accent. */
+
+.ui-root {
+    --ink: rgb(14, 15, 17);
+    --panel: rgba(16, 18, 20, 0.84);
+    --panel-light: rgba(255, 255, 255, 0.06);
+    --sand: rgb(242, 230, 208);
+    --muted: rgba(242, 230, 208, 0.58);
+    --faint: rgba(242, 230, 208, 0.18);
+    --accent: rgb(242, 140, 40);
+    --accent-dim: rgba(242, 140, 40, 0.25);
+    --teal: rgb(70, 196, 180);
+    --good: rgb(132, 206, 112);
+    --bad: rgb(236, 98, 76);
+    color: var(--sand);
+    font-size: 20px;
+}
+
+/* ---------------------------------------------------------------- animation primitives */
+.anim {
+    opacity: 0;
+    translate: 0 18px;
+    transition-property: opacity, translate, scale;
+    transition-duration: 0.38s, 0.45s, 0.45s;
+    transition-timing-function: ease-out-cubic;
+}
+.anim.shown { opacity: 1; translate: 0 0; }
+.slide-left.anim { translate: -60px 0; }
+.slide-left.anim.shown { translate: 0 0; }
+.slide-right.anim { translate: 60px 0; }
+.slide-right.anim.shown { translate: 0 0; }
+.drop.anim { translate: 0 -40px; }
+.drop.anim.shown { translate: 0 0; }
+.pop.anim { scale: 0.92 0.92; translate: 0 0; }
+.pop.anim.shown { scale: 1 1; }
+
+.screen { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+
+/* ---------------------------------------------------------------- type */
+.kicker { font-size: 18px; letter-spacing: 6px; color: var(--accent); }
+.title-xl { font-size: 128px; letter-spacing: 2px; color: var(--sand); margin: -16px 0 -24px 0; -unity-text-outline-width: 0; text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
+.title-sub { font-size: 44px; letter-spacing: 22px; color: var(--sand); opacity: 0.92; }
+.h1 { font-size: 56px; letter-spacing: 2px; }
+.h2 { font-size: 34px; letter-spacing: 1px; }
+.h3 { font-size: 24px; letter-spacing: 2px; color: var(--muted); }
+.body { font-size: 19px; color: var(--muted); white-space: normal; }
+.small { font-size: 15px; color: var(--muted); }
+.accent { color: var(--accent); }
+.good { color: var(--good); }
+.bad { color: var(--bad); }
+
+/* ---------------------------------------------------------------- panels and buttons */
+.panel {
+    background-color: var(--panel);
+    border-radius: 6px;
+    padding: 26px 30px;
+    border-left-width: 3px;
+    border-left-color: var(--accent);
+}
+.panel-plain { background-color: var(--panel); border-radius: 6px; padding: 18px 22px; }
+.row { flex-direction: row; align-items: center; }
+.spacer { flex-grow: 1; }
+.divider { height: 1px; background-color: var(--faint); margin: 14px 0; }
+
+.btn {
+    background-color: var(--panel-light);
+    border-width: 0;
+    border-radius: 4px;
+    color: var(--sand);
+    font-size: 22px;
+    letter-spacing: 2px;
+    padding: 10px 22px;
+    margin: 4px;
+    transition-property: background-color, translate, color;
+    transition-duration: 0.18s;
+}
+.btn:hover { background-color: rgba(255, 255, 255, 0.16); translate: 0 -2px; }
+.btn:active { background-color: var(--accent); color: var(--ink); }
+.btn-primary { background-color: var(--accent); color: var(--ink); }
+.btn-primary:hover { background-color: rgb(255, 168, 82); }
+.btn-ghost { background-color: rgba(0, 0, 0, 0); border-width: 1px; border-color: var(--faint); }
+.btn:disabled { opacity: 0.35; }
+.btn-small { font-size: 17px; padding: 6px 14px; }
+.btn-arrow { width: 44px; padding: 6px 0; -unity-text-align: middle-center; }
+
+/* ---------------------------------------------------------------- title screen */
+.title-shade { position: absolute; left: 0; top: 0; bottom: 0; width: 62%; }
+.title-block { position: absolute; left: 110px; top: 150px; }
+.menu { position: absolute; left: 110px; top: 520px; }
+.menu-item { flex-direction: row; align-items: center; height: 64px; }
+.menu-bar { width: 0; height: 4px; background-color: var(--accent); margin-right: 0; transition-property: width, margin-right; transition-duration: 0.22s; transition-timing-function: ease-out-cubic; }
+.menu-label { font-size: 44px; letter-spacing: 4px; color: var(--muted); transition-property: color, translate; transition-duration: 0.2s; }
+.menu-item:hover .menu-bar { width: 42px; margin-right: 18px; }
+.menu-item:hover .menu-label { color: var(--sand); }
+.title-footer { position: absolute; left: 110px; bottom: 60px; flex-direction: row; }
+.chip { flex-direction: row; align-items: center; background-color: rgba(0, 0, 0, 0.35); border-radius: 18px; padding: 6px 16px; margin-right: 12px; }
+.chip-dot { width: 10px; height: 10px; border-radius: 5px; background-color: var(--accent); margin-right: 10px; }
+
+/* ---------------------------------------------------------------- mission select */
+.missions { position: absolute; left: 90px; top: 110px; bottom: 90px; width: 720px; }
+.mission-card { flex-direction: row; padding: 16px 20px; margin-bottom: 10px; border-radius: 6px; background-color: var(--panel); border-left-width: 3px; border-left-color: rgba(0, 0, 0, 0); transition-property: border-left-color, translate, background-color; transition-duration: 0.18s; }
+.mission-card:hover { border-left-color: var(--accent); translate: 6px 0; }
+.mission-card.selected { border-left-color: var(--accent); background-color: rgba(30, 32, 34, 0.94); }
+.mission-title { font-size: 30px; letter-spacing: 1px; }
+.mission-reward { font-size: 22px; color: var(--accent); }
+.done-badge { font-size: 15px; color: var(--good); letter-spacing: 2px; }
+.brief { position: absolute; right: 90px; bottom: 90px; width: 560px; }
+
+/* ---------------------------------------------------------------- HUD */
+.hud { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.speedo { position: absolute; right: 40px; bottom: 26px; width: 300px; height: 240px; }
+.speedo-gauge { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.speedo-value { position: absolute; left: 0; right: 0; top: 92px; -unity-text-align: middle-center; font-size: 76px; }
+.speedo-unit { position: absolute; left: 0; right: 0; top: 168px; -unity-text-align: middle-center; font-size: 16px; letter-spacing: 4px; color: var(--muted); }
+.speedo-gear { position: absolute; right: 26px; top: 22px; font-size: 30px; color: var(--accent); }
+.surface-chip { position: absolute; right: 52px; bottom: 270px; flex-direction: row; align-items: center; background-color: var(--panel); border-radius: 16px; padding: 6px 14px; }
+.fit-dot { width: 10px; height: 10px; border-radius: 5px; margin-right: 8px; }
+.compass { position: absolute; left: 50%; top: 22px; width: 760px; height: 54px; margin-left: -380px; overflow: hidden; background-color: rgba(10, 11, 12, 0.45); border-radius: 27px; }
+.compass-tick { position: absolute; top: 4px; font-size: 18px; color: var(--muted); -unity-text-align: middle-center; width: 60px; margin-left: -30px; }
+.compass-tick.cardinal { font-size: 26px; color: var(--sand); top: 10px; }
+.compass-marker { position: absolute; top: 26px; width: 160px; margin-left: -80px; -unity-text-align: middle-center; font-size: 15px; color: var(--muted); }
+.compass-marker.objective { color: var(--accent); font-size: 17px; }
+.compass-center { position: absolute; left: 50%; top: 0; width: 2px; height: 10px; margin-left: -1px; background-color: var(--accent); }
+.objective { position: absolute; left: 40px; top: 30px; width: 460px; }
+.objective-title { font-size: 16px; letter-spacing: 4px; color: var(--accent); }
+.objective-text { font-size: 30px; }
+.objective-dist { font-size: 18px; color: var(--muted); }
+.scrap { position: absolute; right: 40px; top: 30px; flex-direction: row; align-items: center; }
+.scrap-value { font-size: 30px; }
+.spare { position: absolute; left: 40px; bottom: 36px; width: 360px; }
+.spare-bar { height: 4px; background-color: var(--faint); margin-top: 8px; border-radius: 2px; }
+.spare-fill { height: 4px; width: 0; background-color: var(--accent); border-radius: 2px; }
+.fps { position: absolute; right: 40px; top: 80px; font-size: 15px; color: var(--good); }
+.hint { position: absolute; left: 0; right: 0; bottom: 120px; -unity-text-align: middle-center; font-size: 19px; color: var(--sand); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
+
+/* ---------------------------------------------------------------- toasts */
+.toasts { position: absolute; left: 50%; top: 96px; width: 640px; margin-left: -320px; align-items: center; }
+.toast { background-color: var(--panel); border-radius: 6px; padding: 14px 26px; margin-bottom: 8px; align-items: center; border-bottom-width: 3px; border-bottom-color: var(--accent); }
+.toast-kicker { font-size: 15px; letter-spacing: 6px; color: var(--accent); }
+.toast-title { font-size: 40px; }
+.toast-sub { font-size: 18px; color: var(--muted); }
+
+/* ---------------------------------------------------------------- pause + settings */
+.pause-shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(8, 9, 10, 0.55); }
+.pause-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 640px; background-color: rgba(14, 15, 17, 0.94); padding: 90px 70px; }
+.setting-row { flex-direction: row; align-items: center; height: 50px; }
+.setting-name { width: 230px; font-size: 20px; color: var(--muted); }
+.setting-value { width: 170px; -unity-text-align: middle-center; font-size: 22px; }
+.segment { flex-direction: row; margin-bottom: 16px; }
+.segment .btn { margin: 0 6px 0 0; font-size: 17px; padding: 8px 12px; }
+.segment .btn.on { background-color: var(--accent); color: var(--ink); }
+
+/* ---------------------------------------------------------------- garage */
+.garage-left { position: absolute; left: 60px; top: 80px; bottom: 60px; width: 640px; }
+.garage-right { position: absolute; right: 60px; bottom: 60px; width: 470px; }
+.garage-top { position: absolute; left: 60px; right: 60px; top: 26px; flex-direction: row; align-items: center; }
+.tabs { flex-direction: row; flex-wrap: wrap; margin: 12px 0 14px 0; }
+.tab { background-color: rgba(0, 0, 0, 0); border-width: 0; color: var(--muted); font-size: 22px; letter-spacing: 2px; padding: 6px 12px; margin: 0 4px 0 0; border-bottom-width: 3px; border-bottom-color: rgba(0, 0, 0, 0); transition-property: color, border-bottom-color; transition-duration: 0.18s; }
+.tab:hover { color: var(--sand); }
+.tab.on { color: var(--sand); border-bottom-color: var(--accent); }
+.cards { flex-grow: 1; }
+.card { background-color: var(--panel); border-radius: 6px; padding: 16px 20px; margin-bottom: 10px; border-left-width: 3px; border-left-color: rgba(0, 0, 0, 0); transition-property: border-left-color, translate; transition-duration: 0.18s; }
+.card:hover { border-left-color: var(--accent-dim); translate: 4px 0; }
+.card.fitted { border-left-color: var(--accent); }
+.card-title { font-size: 30px; }
+.card-tag { font-size: 14px; letter-spacing: 3px; color: var(--accent); margin-left: 12px; }
+.pips { flex-direction: row; margin-left: 12px; }
+.pip { width: 18px; height: 6px; border-radius: 3px; background-color: var(--faint); margin-right: 4px; }
+.pip.on { background-color: var(--accent); }
+.swatches { flex-direction: row; flex-wrap: wrap; }
+.swatch { width: 62px; height: 62px; border-radius: 31px; margin: 6px; border-width: 3px; border-color: rgba(0, 0, 0, 0); transition-property: scale, border-color; transition-duration: 0.15s; }
+.swatch:hover { scale: 1.08 1.08; }
+.swatch.on { border-color: var(--sand); }
+
+.stat { flex-direction: row; align-items: center; height: 28px; }
+.stat-label { width: 120px; font-size: 16px; color: var(--muted); }
+.stat-track { flex-grow: 1; height: 8px; background-color: var(--faint); border-radius: 4px; overflow: hidden; }
+.stat-fill { position: absolute; left: 0; top: 0; bottom: 0; background-color: var(--sand); border-radius: 4px; transition-property: width; transition-duration: 0.45s; transition-timing-function: ease-out-cubic; }
+.stat-ghost { position: absolute; left: 0; top: 0; bottom: 0; background-color: rgba(0, 0, 0, 0); border-radius: 4px; transition-property: width; transition-duration: 0.3s; }
+.stat-ghost.better { background-color: var(--good); }
+.stat-ghost.worse { background-color: var(--bad); }
+.stat-value { width: 80px; -unity-text-align: middle-right; font-size: 16px; }
+
+/* ---------------------------------------------------------------- results */
+.result { position: absolute; left: 50%; top: 50%; width: 640px; margin-left: -320px; margin-top: -200px; align-items: center; }

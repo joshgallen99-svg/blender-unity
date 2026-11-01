@@ -35,6 +35,7 @@ namespace Offroad.World
         class Data
         {
             public List<string> discovered = new List<string>();
+            public List<string> missionsDone = new List<string>();
             public int scrap = 300;
         }
 
@@ -48,6 +49,14 @@ namespace Offroad.World
         public static int DiscoveredCount => D.discovered.Count;
 
         public static bool IsDiscovered(string id) => D.discovered.Contains(id);
+        public static bool IsMissionDone(string id) => D.missionsDone.Contains(id);
+
+        public static void MarkMissionDone(string id)
+        {
+            if (D.missionsDone.Contains(id)) return;
+            D.missionsDone.Add(id);
+            Save();
+        }
 
         public static void Discover(Landmark l)
         {

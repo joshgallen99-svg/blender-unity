@@ -19,8 +19,17 @@ Heavy work runs in the cloud: models are generated with Blender's Python module,
 | Handbrake | Space | B |
 | Reset vehicle | R | Y |
 | Look around | Mouse | Right stick |
+| Swap to the spare wheel (once per expedition, when stopped) | T | X |
 | Pause, settings and graphics presets | Esc or P | Start |
+| Menus: continue / open garage | Enter / G | A / Select |
 | FPS counter | F1 | |
+
+## How it plays
+
+- **Expeditions**: pick a route from base camp (rock garden shakedown, the Needle's Eye arch, Prospector's Well, the Rustbucket salvage, the Chimneys hoodoo field) or free roam.
+- **Scrap**: earned by finishing expeditions and discovering landmarks; spent in the garage.
+- **Garage**: two bodies (Ridgeback short-wheelbase wagon, Packhorse long-wheelbase pickup), three tyre types with surface trade-offs (Trailhound A/T all-rounder, Gripjaw M/T rock crawler that bogs in sand, Dunerunner sand floater that slides on rock), tyre grades, engine and suspension stages, accessories and paint.
+- **Spare wheel**: whatever tyre you mount on the back can be swapped on once per expedition. Choose it for the terrain you expect at the far end of the route.
 
 Graphics presets: **Battery Saver** (30 FPS cap, runs cool), **Low**, **Medium** (default on Mac), **High**, and individual options.
 
@@ -28,10 +37,14 @@ Graphics presets: **Battery Saver** (30 FPS cap, runs cool), **Low**, **Medium**
 
 | Path | What |
 |---|---|
-| `blender/vehicles/` | Vehicle models (the Ridgeback 4x4) |
+| `blender/vehicles/` | The fleet: two bodies, three tyre types, accessories |
+| `blender/landmarks/` | Landmarks: arch, balanced rock, windmill outpost, wreck, camp, cairns |
 | `blender/props/` | Scenery: rocks, boulders, scrub, yuccas, dead trees |
 | `blender/preview/` | Quick Cycles renders for reviewing models |
-| `tools/terrain/` | Terrain generator: heightmap, paint layers, ground textures, prop placement |
+| `tools/terrain/` | Terrain generator: heightmap, paint layers, ground textures, landmark sites, clustered scenery |
+| `tools/art/` | Procedural foliage sprites and wood/rust/steel/canvas textures |
+| `Assets/Art/Shaders/` | Triplanar sandstone rock shader and wind-swaying foliage shader |
+| `Assets/UI/` | UI Toolkit stylesheet and fonts (Barlow, SIL Open Font License) |
 | `Assets/Scripts/` | Game code: vehicle physics, camera, settings, HUD, atmosphere |
 | `Assets/Editor/` | Builds the scene, materials, prefabs and project settings from code |
 | `Assets/Tests/` | Edit-mode asset checks and play-mode vehicle physics tests |

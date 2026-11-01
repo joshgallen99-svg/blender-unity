@@ -4,7 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${1:-python3}"
-"$PY" blender/vehicles/ridgeback.py
+"$PY" tools/art/generate_foliage_textures.py
+"$PY" tools/art/generate_material_textures.py
+"$PY" blender/vehicles/fleet.py
 "$PY" blender/props/desert_props.py
+"$PY" blender/landmarks/desert_landmarks.py
 "$PY" tools/terrain/generate_desert.py
 echo "All assets regenerated."

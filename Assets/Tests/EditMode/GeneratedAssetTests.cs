@@ -8,7 +8,7 @@ using UnityEngine;
 /// <summary>Checks that the Blender/Python outputs import into Unity the way the game expects.</summary>
 public class GeneratedAssetTests
 {
-    const string Vehicle = "Assets/Models/Vehicles/Ridgeback.fbx";
+    const string Vehicle = "Assets/Models/Vehicles/Fleet.fbx";
     const string Props = "Assets/Models/Props/DesertProps.fbx";
 
     static Mesh MeshOf(string model, string child, out Material[] mats)
@@ -24,7 +24,7 @@ public class GeneratedAssetTests
     [Test]
     public void VehicleFacesForwardAndIsUpright()
     {
-        var body = MeshOf(Vehicle, "Body", out var mats);
+        var body = MeshOf(Vehicle, "Body_Ridgeback", out var mats);
         var b = body.bounds;
         Assert.Greater(b.size.z, b.size.x * 1.8f, "vehicle length should run along Z");
         Assert.That(b.size.y, Is.InRange(2.0f, 3.2f), "height (incl. antenna) in metres");
@@ -45,7 +45,7 @@ public class GeneratedAssetTests
     public void WheelMarkersMatchRigDefaults()
     {
         var go = AssetDatabase.LoadAssetAtPath<GameObject>(Vehicle);
-        string[] names = { "WheelFL", "WheelFR", "WheelRL", "WheelRR" };
+        string[] names = { "Ridgeback_WheelFL", "Ridgeback_WheelFR", "Ridgeback_WheelRL", "Ridgeback_WheelRR" };
         for (int i = 0; i < 4; i++)
         {
             var t = go.transform.Find(names[i]);
@@ -58,12 +58,42 @@ public class GeneratedAssetTests
     [Test]
     public void WheelShowFaceIsOnLeft()
     {
-        var wheel = MeshOf(Vehicle, "Wheel", out var mats);
+        var wheel = MeshOf(Vehicle, "Wheel_AT", out var mats);
         int cap = System.Array.FindIndex(mats, m => m && m.name == "Steel");
         Assert.GreaterOrEqual(cap, 0);
         var verts = wheel.vertices;
         float x = wheel.GetTriangles(cap).Average(i => verts[i].x);
         Assert.Less(x, 0f, "hub cap / bolts should face -X (vehicle left) so the rig can mirror right wheels");
+    }
+
+    [Test]
+    public void FleetHasEveryPartTheGarageSells()
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>(Vehicle);
+        foreach (var b in Offroad.Garage.Catalog.Bodies)
+        {
+            Assert.IsNotNull(go.transform.Find($"Body_{b.mesh}"), b.mesh);
+            Assert.IsNotNull(go.transform.Find($"{b.mesh}_Spare"), b.mesh + " spare mount");
+            foreach (var a in Offroad.Garage.Catalog.Accessories)
+                Assert.IsNotNull(go.transform.Find($"{a.id}_{b.mesh}"), $"{a.id} for {b.mesh}");
+        }
+        foreach (var t in Offroad.Garage.Catalog.Tires) Assert.IsNotNull(go.transform.Find(t.mesh), t.mesh);
+        // Packhorse wheelbase is 3 m.
+        Assert.AreEqual(1.5f, go.transform.Find("Packhorse_WheelFL").localPosition.z, 0.02f);
+    }
+
+    [Test]
+    public void TyreTradeOffsPointTheRightWay()
+    {
+        var sand = new Vector4(1, 0, 0, 0);
+        var rock = new Vector4(0, 0, 0, 1);
+        var at = Offroad.Garage.Catalog.Tire("at");
+        var mt = Offroad.Garage.Catalog.Tire("mt");
+        var dune = Offroad.Garage.Catalog.Tire("dune");
+        Assert.Greater(Offroad.Garage.Catalog.Suitability(dune, sand), Offroad.Garage.Catalog.Suitability(at, sand));
+        Assert.Greater(Offroad.Garage.Catalog.Suitability(at, sand), Offroad.Garage.Catalog.Suitability(mt, sand));
+        Assert.Greater(Offroad.Garage.Catalog.Suitability(mt, rock), Offroad.Garage.Catalog.Suitability(at, rock));
+        Assert.Greater(Offroad.Garage.Catalog.Suitability(at, rock), Offroad.Garage.Catalog.Suitability(dune, rock));
     }
 
     [Test]

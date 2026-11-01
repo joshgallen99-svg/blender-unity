@@ -161,6 +161,7 @@ jobs:
         run: |
           APP=$(sudo find build -maxdepth 4 -name "*.app" -type d | head -1)
           echo "Found app: $APP"
+          if [ "$(basename "$APP")" != "Offroad Expedition.app" ]; then sudo mv "$APP" "$(dirname "$APP")/Offroad Expedition.app"; APP="$(dirname "$APP")/Offroad Expedition.app"; fi
           sudo tar -czf "$RUNNER_TEMP/Offroad-Expedition-mac.tar.gz" -C "$(dirname "$APP")" "$(basename "$APP")"
           ls -lh "$RUNNER_TEMP/Offroad-Expedition-mac.tar.gz"
 

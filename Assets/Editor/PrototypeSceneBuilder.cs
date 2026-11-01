@@ -27,7 +27,7 @@ namespace Offroad.EditorTools
         const string SourceDir = "Assets/Terrain/Source~";
         const string GeneratedDir = "Assets/Terrain/Generated";
         const string PrefabDir = "Assets/Prefabs";
-        const string VehicleModel = "Assets/Models/Vehicles/Ridgeback.fbx";
+        const string VehicleModel = "Assets/Models/Vehicles/Fleet.fbx";
         const string PropsModel = "Assets/Models/Props/DesertProps.fbx";
         const string LandmarksModel = "Assets/Models/Landmarks/DesertLandmarks.fbx";
 
@@ -96,7 +96,7 @@ namespace Offroad.EditorTools
             PlaceLandmarks(terrain, info);
             var vehicle = CreateVehicle(terrain, info);
             var cam = CreateCamera(vehicle);
-            CreateSystems(vehicle, sun);
+            CreateSystems(vehicle, cam);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -384,39 +384,76 @@ namespace Offroad.EditorTools
 
         // ------------------------------------------------------------------ vehicle
 
-        static OffroadVehicle CreateVehicle(Terrain terrain, RegionInfo info)
+        static readonly string[] WheelMarkers = { "WheelFL", "WheelFR", "WheelRL", "WheelRR" };
+
+        /// <summary>Collects every body, tyre and accessory mesh from Fleet.fbx into a VehicleArt asset.</summary>
+        static VehicleArt BuildVehicleArt()
         {
             var model = AssetDatabase.LoadAssetAtPath<GameObject>(VehicleModel);
             if (model == null) throw new Exception("Vehicle model missing: " + VehicleModel);
-            var body = model.transform.Find("Body");
-            var wheel = model.transform.Find("Wheel");
-
-            var positions = new[] { "WheelFL", "WheelFR", "WheelRL", "WheelRR" }
-                .Select((n, i) =>
-                {
-                    var t = model.transform.Find(n);
-                    var p = t ? t.localPosition : VehicleRig.DefaultWheelPositions[i];
-                    if ((p - VehicleRig.DefaultWheelPositions[i]).magnitude > 0.05f)
-                        Debug.LogWarning($"[Offroad] {n} at {p} differs from expected {VehicleRig.DefaultWheelPositions[i]} - check FBX axes");
-                    return p;
-                }).ToArray();
-
-            var parts = new VehicleRig.Parts
+            const string path = "Assets/Art/VehicleArt.asset";
+            var art = AssetDatabase.LoadAssetAtPath<VehicleArt>(path);
+            if (art == null)
             {
-                body = body.GetComponent<MeshFilter>().sharedMesh,
-                bodyMaterials = MaterialLibrary.Remap(body.GetComponent<MeshRenderer>().sharedMaterials),
-                wheel = wheel.GetComponent<MeshFilter>().sharedMesh,
-                wheelMaterials = MaterialLibrary.Remap(wheel.GetComponent<MeshRenderer>().sharedMaterials),
-                wheelPositions = positions,
-                dustMaterial = MaterialLibrary.Dust(),
-                bodyPhysicsMaterial = MaterialLibrary.VehicleBodyPhysics(),
-            };
+                art = ScriptableObject.CreateInstance<VehicleArt>();
+                AssetDatabase.CreateAsset(art, path);
+            }
 
-            var root = new GameObject("Ridgeback");
-            VehicleRig.Assemble(root, parts);
+            VehicleArt.Part Part(string name)
+            {
+                var t = model.transform.Find(name);
+                if (t == null) throw new Exception($"{VehicleModel} has no '{name}'");
+                return new VehicleArt.Part
+                {
+                    id = name,
+                    mesh = t.GetComponent<MeshFilter>().sharedMesh,
+                    materials = MaterialLibrary.Remap(t.GetComponent<MeshRenderer>().sharedMaterials),
+                };
+            }
+
+            Vector3 Marker(string name)
+            {
+                var t = model.transform.Find(name);
+                if (t == null) throw new Exception($"{VehicleModel} has no marker '{name}'");
+                return t.localPosition;
+            }
+
+            art.bodies = new[] { "Ridgeback", "Packhorse" }.Select(b => new VehicleArt.BodyArt
+            {
+                id = b,
+                body = Part($"Body_{b}"),
+                wheelPositions = WheelMarkers.Select(w => Marker($"{b}_{w}")).ToArray(),
+                spareMount = Marker($"{b}_Spare"),
+                accessories = new[] { Part($"RoofRack_{b}"), Part($"Snorkel_{b}"), Part($"BullBar_{b}") },
+            }).ToArray();
+            art.tires = new[] { Part("Wheel_AT"), Part("Wheel_MT"), Part("Wheel_Dune") };
+            art.dustMaterial = MaterialLibrary.Dust();
+            art.bodyPhysics = MaterialLibrary.VehicleBodyPhysics();
+            EditorUtility.SetDirty(art);
+            AssetDatabase.SaveAssets();
+
+            var fl = art.bodies[0].wheelPositions[0];
+            if ((fl - VehicleRig.DefaultWheelPositions[0]).magnitude > 0.05f)
+                Debug.LogWarning($"[Offroad] Ridgeback FL wheel at {fl}, expected {VehicleRig.DefaultWheelPositions[0]} - check FBX axes");
+            return art;
+        }
+
+        static OffroadVehicle CreateVehicle(Terrain terrain, RegionInfo info)
+        {
+            var art = BuildVehicleArt();
+            var root = new GameObject("Expedition Vehicle");
+            VehicleRig.Assemble(root, new VehicleRig.Parts
+            {
+                wheelPositions = art.Body("Ridgeback").wheelPositions,
+                dustMaterial = art.dustMaterial,
+                bodyPhysicsMaterial = art.bodyPhysics,
+            });
             root.AddComponent<PlayerVehicleController>();
+            var assembler = root.AddComponent<VehicleAssembler>();
+            assembler.art = art;
+            assembler.Apply(new Garage.Loadout());   // default build; the saved loadout is fitted at runtime
             Directory.CreateDirectory(PrefabDir);
-            var prefab = PrefabUtility.SaveAsPrefabAsset(root, $"{PrefabDir}/Ridgeback.prefab");
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, $"{PrefabDir}/ExpeditionVehicle.prefab");
             Object.DestroyImmediate(root);
 
             var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
@@ -451,16 +488,51 @@ namespace Offroad.EditorTools
             return cam;
         }
 
-        static void CreateSystems(OffroadVehicle vehicle, Light sun)
+        static void CreateSystems(OffroadVehicle vehicle, Camera cam)
         {
             var go = new GameObject("Systems");
             go.AddComponent<Atmosphere>();
-            var menu = go.AddComponent<SettingsMenu>();
-            menu.vehicle = vehicle;
-            var hud = go.AddComponent<Hud>();
-            hud.vehicle = vehicle;
-            hud.menu = menu;
             go.AddComponent<DiscoveryTracker>().player = vehicle.transform;
+            var runner = go.AddComponent<Game.MissionRunner>();
+            runner.vehicle = vehicle;
+
+            var uiGo = new GameObject("UI");
+            var doc = uiGo.AddComponent<UnityEngine.UIElements.UIDocument>();
+            doc.panelSettings = PanelSettingsAsset();
+            var ui = uiGo.AddComponent<UIRoot>();
+            ui.style = AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.StyleSheet>("Assets/UI/Styles/Game.uss");
+            ui.body = AssetDatabase.LoadAssetAtPath<Font>("Assets/UI/Fonts/Barlow-Medium.ttf");
+            ui.bodyBold = AssetDatabase.LoadAssetAtPath<Font>("Assets/UI/Fonts/Barlow-SemiBold.ttf");
+            ui.head = AssetDatabase.LoadAssetAtPath<Font>("Assets/UI/Fonts/BarlowCondensed-Bold.ttf");
+            ui.headSemi = AssetDatabase.LoadAssetAtPath<Font>("Assets/UI/Fonts/BarlowCondensed-SemiBold.ttf");
+            if (ui.style == null || ui.head == null) Debug.LogWarning("[Offroad] UI stylesheet or fonts missing");
+            ui.runner = runner;
+            ui.vehicle = vehicle;
+
+            var flow = go.AddComponent<Game.GameFlow>();
+            flow.vehicle = vehicle;
+            flow.cam = cam.GetComponent<ChaseCamera>();
+            flow.runner = runner;
+            flow.ui = ui;
+            ui.flow = flow;
+        }
+
+        static UnityEngine.UIElements.PanelSettings PanelSettingsAsset()
+        {
+            const string path = "Assets/UI/PanelSettings.asset";
+            var ps = AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.PanelSettings>(path);
+            if (ps == null)
+            {
+                ps = ScriptableObject.CreateInstance<UnityEngine.UIElements.PanelSettings>();
+                AssetDatabase.CreateAsset(ps, path);
+            }
+            ps.themeStyleSheet = AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.ThemeStyleSheet>("Assets/UI/Styles/RuntimeTheme.tss");
+            ps.scaleMode = UnityEngine.UIElements.PanelScaleMode.ScaleWithScreenSize;
+            ps.referenceResolution = new Vector2Int(1920, 1080);
+            ps.screenMatchMode = UnityEngine.UIElements.PanelScreenMatchMode.MatchWidthOrHeight;
+            ps.match = 0.5f;
+            EditorUtility.SetDirty(ps);
+            return ps;
         }
 
         static T ReadJson<T>(string path) => JsonUtility.FromJson<T>(File.ReadAllText(path));

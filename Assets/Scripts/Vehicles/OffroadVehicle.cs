@@ -75,6 +75,7 @@ namespace Offroad.Vehicles
         public float reverseDelay = 0.3f;
 
         [Header("Tyres")]
+        public TireProfile tire = TireProfile.Neutral;
         public float tireGrip = 1.05f;           // friction coefficient on a neutral surface
         [Range(0, 1)] public float lateralStiffness = 0.82f;
         [Range(0, 1)] public float handbrakeRearGrip = 0.35f;
@@ -224,10 +225,11 @@ namespace Offroad.Vehicles
                 float gLat = Vector3.Dot(Physics.gravity, right);
                 w.forwardSpeed = vLong;
 
-                float grip = tireGrip * w.surface.grip;
+                float tireFit = tire.GripOn(w.surface);
+                float grip = tireGrip * w.surface.grip * tireFit;
                 bool handbraked = controls.handbrake && !w.front;
 
-                float fLong = drivenGrounded > 0 ? driveTotal / drivenGrounded * w.surface.traction : 0f;
+                float fLong = drivenGrounded > 0 ? driveTotal / drivenGrounded * w.surface.traction * Mathf.Min(1.15f, tireFit) : 0f;
                 float stopForce = -(vLong / dt + gLong) * massShare;
                 if (brakeAmount > 0f || handbraked)
                 {
@@ -238,7 +240,7 @@ namespace Offroad.Vehicles
                 {
                     fLong += stopForce;                        // hold on slopes when no pedal is pressed
                 }
-                fLong -= vLong * (rollingResistance + w.surface.drag * 220f);
+                fLong -= vLong * (rollingResistance * tire.rolling + w.surface.drag * 220f * tire.DragOn(w.surface));
 
                 float latGrip = lateralStiffness * (handbraked ? handbrakeRearGrip : 1f);
                 float fLat = -(vLat / dt + gLat) * massShare * latGrip;

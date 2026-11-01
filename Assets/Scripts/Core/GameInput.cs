@@ -19,6 +19,10 @@ namespace Offroad.Core
         public static bool ResetPressed { get; private set; }
         public static bool MenuPressed { get; private set; }
         public static bool FpsTogglePressed { get; private set; }
+        public static bool SwapSparePressed { get; private set; }
+        public static bool AnyPressed { get; private set; }
+        public static bool ConfirmPressed { get; private set; }
+        public static bool GaragePressed { get; private set; }
         public static bool UsingGamepad { get; private set; }
 
         static int _lastFrame = -1;
@@ -33,7 +37,7 @@ namespace Offroad.Core
             _lastFrame = Time.frameCount;
 
             float throttle = 0, brake = 0, steer = 0;
-            bool handbrake = false, reset = false, menu = false, fps = false;
+            bool handbrake = false, reset = false, menu = false, fps = false, swap = false, any = false, confirm = false, garage = false;
             Vector2 look = Vector2.zero;
             bool pad = false;
 
@@ -49,6 +53,10 @@ namespace Offroad.Core
                 reset = kb.rKey.wasPressedThisFrame;
                 menu = kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame;
                 fps = kb.f1Key.wasPressedThisFrame;
+                swap = kb.tKey.wasPressedThisFrame;
+                any = kb.anyKey.wasPressedThisFrame;
+                confirm = kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
+                garage = kb.gKey.wasPressedThisFrame;
             }
             var mouse = Mouse.current;
             if (mouse != null) look = mouse.delta.ReadValue() * 0.1f;
@@ -67,6 +75,10 @@ namespace Offroad.Core
                 handbrake |= gp.buttonEast.isPressed;
                 reset |= gp.buttonNorth.wasPressedThisFrame;
                 menu |= gp.startButton.wasPressedThisFrame;
+                swap |= gp.buttonWest.wasPressedThisFrame;
+                any |= gp.buttonSouth.wasPressedThisFrame || gp.startButton.wasPressedThisFrame;
+                confirm |= gp.buttonSouth.wasPressedThisFrame;
+                garage |= gp.selectButton.wasPressedThisFrame;
             }
 #elif ENABLE_LEGACY_INPUT_MANAGER
             if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) throttle = 1;
@@ -77,6 +89,10 @@ namespace Offroad.Core
             reset = Input.GetKeyDown(KeyCode.R);
             menu = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P);
             fps = Input.GetKeyDown(KeyCode.F1);
+            swap = Input.GetKeyDown(KeyCode.T);
+            any = Input.anyKeyDown;
+            confirm = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+            garage = Input.GetKeyDown(KeyCode.G);
             if (_mouseAxesOk)
             {
                 try { look = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")); }
@@ -91,6 +107,10 @@ namespace Offroad.Core
             ResetPressed = reset;
             MenuPressed = menu;
             FpsTogglePressed = fps;
+            SwapSparePressed = swap;
+            AnyPressed = any;
+            ConfirmPressed = confirm;
+            GaragePressed = garage;
             UsingGamepad = pad || (UsingGamepad && look == Vector2.zero && throttle == 0 && steer == 0);
         }
     }
