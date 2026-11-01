@@ -2,8 +2,13 @@ name: Test and build WebGL
 
 on:
   push:
-    branches: ['**', '!webgl-build']
+    branches: ['**', '!webgl-build', '!unity-refs']
   workflow_dispatch:
+    inputs:
+      export_refs:
+        description: 'Also export Unity reference DLLs to the unity-refs branch'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -85,3 +90,24 @@ jobs:
           git add -A
           git commit -qm "WebGL build of ${GITHUB_SHA}"
           git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" webgl-build
+
+      - name: Export Unity reference DLLs to unity-refs branch (for offline compile checks)
+        if: steps.check.outputs.ok == 'true' && inputs.export_refs
+        run: |
+          OUT="$RUNNER_TEMP/refs"; mkdir -p "$OUT/Editor" "$OUT/ScriptAssemblies" "$OUT/PackageCache"
+          IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep unityci/editor | head -1)
+          echo "Using image $IMAGE"
+          docker run --rm -v "$OUT/Editor:/out" "$IMAGE" bash -c '
+            cd /opt/unity/Editor/Data
+            find Managed NetStandard MonoBleedingEdge/lib/mono/4.7.1-api -name "*.dll" -size -90M | tar -cf - -T - | tar -xf - -C /out'
+          sudo cp Library/ScriptAssemblies/*.dll "$OUT/ScriptAssemblies/" || true
+          for p in Library/PackageCache/com.unity.ext.nunit*; do sudo cp -r "$p" "$OUT/PackageCache/"; done
+          sudo chown -R "$(id -u)" "$OUT"
+          du -sh "$OUT"/*
+          cd "$OUT"
+          git init -q -b unity-refs
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "Unity reference assemblies"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" unity-refs
