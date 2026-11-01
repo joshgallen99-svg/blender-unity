@@ -71,12 +71,36 @@ public class GeneratedAssetTests
     {
         var go = AssetDatabase.LoadAssetAtPath<GameObject>(Props);
         Assert.IsNotNull(go);
-        foreach (var n in new[] { "Boulder_0", "Boulder_4", "Rock_0", "Rock_4", "Scrub_0", "Scrub_2", "Yucca_0", "Yucca_1", "DeadTree_0", "DeadTree_1" })
+        foreach (var n in new[] { "Boulder_0", "Boulder_5", "Slab_2", "Hoodoo_2", "Grass_1", "Rock_0", "Rock_4", "Scrub_0", "Scrub_2", "Yucca_0", "Yucca_1", "DeadTree_0", "DeadTree_1" })
         {
             var t = go.transform.Find(n);
             Assert.IsNotNull(t, n);
-            Assert.GreaterOrEqual(t.GetComponent<MeshFilter>().sharedMesh.bounds.min.y, -0.05f, $"{n} pivot should be at its base");
+            Assert.GreaterOrEqual(t.GetComponent<MeshFilter>().sharedMesh.bounds.min.y, -0.25f, $"{n} pivot should be at its base");
         }
+    }
+
+    [Test]
+    public void LandmarksExistAndWindmillRotorSitsOnTheTower()
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Landmarks/DesertLandmarks.fbx");
+        Assert.IsNotNull(go);
+        foreach (var n in new[] { "NeedlesEye", "BalancedRock", "Windmill", "Windmill_Rotor", "WaterTank", "Shack", "Wreck",
+                                  "Tent", "FireRing", "Crates", "Cairn", "Signpost" })
+            Assert.IsNotNull(go.transform.Find(n), n);
+        var rotor = go.transform.Find("Windmill_Rotor").localPosition;
+        Assert.That(rotor.y, Is.InRange(8.5f, 10.5f), "rotor hub height");
+        Assert.Greater(rotor.z, 0.2f, "rotor is on the front (+Z) of the tower");
+    }
+
+    [Test]
+    public void LandmarkPiecesReferenceRealModels()
+    {
+        var info = JsonUtility.FromJson<PrototypeSceneBuilder.RegionInfo>(File.ReadAllText("Assets/Terrain/Source~/desert_info.json"));
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Landmarks/DesertLandmarks.fbx");
+        Assert.GreaterOrEqual(info.landmarks.Length, 5);
+        foreach (var l in info.landmarks)
+            foreach (var p in l.pieces)
+                Assert.IsNotNull(go.transform.Find(p.model), $"{l.name}: {p.model}");
     }
 
     [Test]

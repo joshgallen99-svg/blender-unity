@@ -22,4 +22,20 @@ img = (sp[..., :, None] * cols[None, None]).sum(2) * (0.25 + 0.95 * shade[..., N
 img = img[::-1].copy()
 s = info["spawn"]; px, pz = int(s["x"] / info["size"] * (N - 1)), N - 1 - int(s["z"] / info["size"] * (N - 1))
 img[pz - 6:pz + 6, px - 6:px + 6] = [0.1, 0.9, 1.0]
-Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).resize((768, 768)).save(sys.argv[1])
+
+
+def dot(x, z, r, col):
+    px_, pz_ = int(x / info["size"] * (N - 1)), N - 1 - int(z / info["size"] * (N - 1))
+    img[max(pz_ - r, 0):pz_ + r + 1, max(px_ - r, 0):px_ + r + 1] = col
+
+
+import json as _json  # noqa: E402
+colours = {"Hoodoo": [0.9, 0.2, 0.9], "Boulder": [0.25, 0.1, 0.05], "Slab": [0.9, 0.9, 0.2], "Scrub": [0.2, 0.55, 0.15],
+           "Grass": [0.75, 0.7, 0.4], "Yucca": [0.1, 0.4, 0.3], "DeadTree": [1, 1, 1], "Rock": [0.45, 0.3, 0.2]}
+for p_ in _json.load(open(os.path.join(SRC, "desert_scatter.json")))["props"]:
+    dot(p_["x"], p_["z"], 2 if p_["kind"] in ("Hoodoo", "Boulder", "DeadTree", "Slab") else 1, colours.get(p_["kind"], [0, 0, 0]))
+for m in info.get("markers", []):
+    dot(m["x"], m["z"], 3, [1, 1, 0.6])
+for L_ in info.get("landmarks", []):
+    dot(L_["x"], L_["z"], 7, [1, 0.25, 0.1])
+Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).resize((900, 900)).save(sys.argv[1])

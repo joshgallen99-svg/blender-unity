@@ -12,6 +12,301 @@
   "spawn": {
     "x": 485.74,
     "z": 445.19,
-    "yaw": -68.9
-  }
+    "yaw": -69.0
+  },
+  "landmarks": [
+    {
+      "id": "basecamp",
+      "name": "Base Camp",
+      "x": 494.35,
+      "z": 467.59,
+      "radius": 14,
+      "discoverRadius": 1,
+      "pieces": [
+        {
+          "model": "Tent",
+          "x": 493.63,
+          "z": 465.72,
+          "yaw": 21.0,
+          "sink": 0.02,
+          "align": 0.0
+        },
+        {
+          "model": "FireRing",
+          "x": 491.98,
+          "z": 471.18,
+          "yaw": 21.0,
+          "sink": 0.05,
+          "align": 0.0
+        },
+        {
+          "model": "Crates",
+          "x": 497.52,
+          "z": 466.91,
+          "yaw": 51.0,
+          "sink": 0.0,
+          "align": 0.0
+        },
+        {
+          "model": "Signpost",
+          "x": 490.19,
+          "z": 459.55,
+          "yaw": 31.0,
+          "sink": 0.1,
+          "align": 0.0
+        }
+      ]
+    },
+    {
+      "id": "needles_eye",
+      "name": "The Needle's Eye",
+      "x": 543.07,
+      "z": 739.66,
+      "radius": 24,
+      "discoverRadius": 52.800000000000004,
+      "pieces": [
+        {
+          "model": "NeedlesEye",
+          "x": 543.07,
+          "z": 739.66,
+          "yaw": 281.0,
+          "sink": 0.6,
+          "align": 0.0
+        }
+      ]
+    },
+    {
+      "id": "prospectors_well",
+      "name": "Prospector's Well",
+      "x": 619.89,
+      "z": 143.68,
+      "radius": 22,
+      "discoverRadius": 48.400000000000006,
+      "pieces": [
+        {
+          "model": "Windmill",
+          "x": 619.89,
+          "z": 143.68,
+          "yaw": 336.0,
+          "sink": 0.1,
+          "align": 0.0
+        },
+        {
+          "model": "WaterTank",
+          "x": 625.52,
+          "z": 144.55,
+          "yaw": 336.0,
+          "sink": 0.05,
+          "align": 0.0
+        },
+        {
+          "model": "Shack",
+          "x": 608.72,
+          "z": 144.18,
+          "yaw": 66.0,
+          "sink": 0.05,
+          "align": 0.0
+        },
+        {
+          "model": "Crates",
+          "x": 614.76,
+          "z": 139.21,
+          "yaw": 316.0,
+          "sink": 0.0,
+          "align": 0.0
+        }
+      ]
+    },
+    {
+      "id": "chimneys",
+      "name": "The Chimneys",
+      "x": 198.14,
+      "z": 212.42,
+      "radius": 70,
+      "discoverRadius": 90,
+      "pieces": [
+        {
+          "model": "BalancedRock",
+          "x": 198.14,
+          "z": 212.42,
+          "yaw": 35,
+          "sink": 0.3,
+          "align": 0.0
+        }
+      ]
+    },
+    {
+      "id": "rustbucket",
+      "name": "Rustbucket",
+      "x": 814.11,
+      "z": 361.75,
+      "radius": 8,
+      "discoverRadius": 17.6,
+      "pieces": [
+        {
+          "model": "Wreck",
+          "x": 814.11,
+          "z": 361.75,
+          "yaw": 279.2,
+          "sink": 0.4,
+          "align": 0.7
+        }
+      ]
+    },
+    {
+      "id": "rock_garden",
+      "name": "The Rock Garden",
+      "x": 431.95,
+      "z": 305.17,
+      "radius": 32,
+      "discoverRadius": 40,
+      "pieces": []
+    }
+  ],
+  "markers": [
+    {
+      "model": "Cairn",
+      "x": 672.33,
+      "z": 84.33,
+      "yaw": 168.8,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 742.95,
+      "z": 151.76,
+      "yaw": 32.9,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 678.45,
+      "z": 224.29,
+      "yaw": 302.4,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 618.65,
+      "z": 282.0,
+      "yaw": 108.9,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 617.22,
+      "z": 370.37,
+      "yaw": 5.7,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 543.45,
+      "z": 432.57,
+      "yaw": 97.9,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 458.73,
+      "z": 467.21,
+      "yaw": 104.7,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 374.87,
+      "z": 499.08,
+      "yaw": 327.2,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 300.39,
+      "z": 540.44,
+      "yaw": 166.7,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 328.08,
+      "z": 594.3,
+      "yaw": 40.0,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 403.93,
+      "z": 643.93,
+      "yaw": 140.0,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 450.77,
+      "z": 727.81,
+      "yaw": 112.7,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 475.33,
+      "z": 798.35,
+      "yaw": 263.9,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 552.48,
+      "z": 838.84,
+      "yaw": 237.1,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 636.49,
+      "z": 871.88,
+      "yaw": 170.7,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 719.98,
+      "z": 909.83,
+      "yaw": 276.5,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 469.95,
+      "z": 305.17,
+      "yaw": 0,
+      "sink": 0.05,
+      "align": 0.0
+    },
+    {
+      "model": "Cairn",
+      "x": 393.95,
+      "z": 305.17,
+      "yaw": 0,
+      "sink": 0.05,
+      "align": 0.0
+    }
+  ]
 }

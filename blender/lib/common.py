@@ -250,6 +250,21 @@ def mirror_x(obj, name=None):
     return dup
 
 
+def box_uv(obj, scale=1.0):
+    """Box-projected UVs in metres (1 UV unit = `scale` m), for tiling textures on hard-surface props."""
+    me = obj.data
+    if not me.uv_layers:
+        me.uv_layers.new(name="UVMap")
+    uvl = me.uv_layers.active.data
+    for poly in me.polygons:
+        n = poly.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            u, v = ((co.y, co.z), (co.x, co.z), (co.x, co.y))[ax]
+            uvl[li].uv = (u / scale, v / scale)
+
+
 def tri_count(obj):
     return sum(len(p.vertices) - 2 for p in obj.data.polygons)
 

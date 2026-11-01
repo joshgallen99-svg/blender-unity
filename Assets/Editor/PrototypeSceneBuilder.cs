@@ -29,6 +29,7 @@ namespace Offroad.EditorTools
         const string PrefabDir = "Assets/Prefabs";
         const string VehicleModel = "Assets/Models/Vehicles/Ridgeback.fbx";
         const string PropsModel = "Assets/Models/Props/DesertProps.fbx";
+        const string LandmarksModel = "Assets/Models/Landmarks/DesertLandmarks.fbx";
 
         [Serializable] public class SpawnInfo { public float x, z, yaw; }
         [Serializable] public class RegionInfo
@@ -37,6 +38,15 @@ namespace Offroad.EditorTools
             public int resolution, splatResolution;
             public string[] layers;
             public SpawnInfo spawn;
+            public LandmarkInfo[] landmarks;
+            public PieceInfo[] markers;
+        }
+        [Serializable] public class PieceInfo { public string model; public float x, z, yaw, sink, align; }
+        [Serializable] public class LandmarkInfo
+        {
+            public string id, name;
+            public float x, z, radius, discoverRadius;
+            public PieceInfo[] pieces;
         }
         [Serializable] public class PropEntry { public string kind; public int variant; public float x, z, yaw, scale, sink; }
         [Serializable] public class ScatterFile { public PropEntry[] props; }
@@ -52,8 +62,11 @@ namespace Offroad.EditorTools
         static readonly Dictionary<string, PropKind> Kinds = new Dictionary<string, PropKind>
         {
             ["Boulder"] = new PropKind { cullHeight = 0.004f, shadows = true, collider = 1, alignToGround = 0.6f },
+            ["Slab"] = new PropKind { cullHeight = 0.006f, shadows = true, collider = 1, alignToGround = 0.85f },
+            ["Hoodoo"] = new PropKind { cullHeight = 0.0015f, shadows = true, collider = 1, alignToGround = 0f },
             ["Rock"] = new PropKind { cullHeight = 0.012f, shadows = false, collider = 2, alignToGround = 0.8f },
             ["Scrub"] = new PropKind { cullHeight = 0.014f, shadows = true, collider = 0, alignToGround = 0.3f },
+            ["Grass"] = new PropKind { cullHeight = 0.03f, shadows = false, collider = 0, alignToGround = 0.6f },
             ["Yucca"] = new PropKind { cullHeight = 0.012f, shadows = true, collider = 0, alignToGround = 0.1f },
             ["DeadTree"] = new PropKind { cullHeight = 0.006f, shadows = true, collider = 3, alignToGround = 0.05f },
         };
@@ -72,6 +85,7 @@ namespace Offroad.EditorTools
             MaterialLibrary.EnsureAll();
             AssetDatabase.ImportAsset(VehicleModel, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(PropsModel, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(LandmarksModel, ImportAssetOptions.ForceUpdate);
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var info = ReadJson<RegionInfo>($"{SourceDir}/{Region}_info.json");
@@ -79,6 +93,7 @@ namespace Offroad.EditorTools
             var sun = CreateLighting();
             var terrain = CreateTerrain(info);
             PlaceProps(terrain, info);
+            PlaceLandmarks(terrain, info);
             var vehicle = CreateVehicle(terrain, info);
             var cam = CreateCamera(vehicle);
             CreateSystems(vehicle, sun);
@@ -276,6 +291,97 @@ namespace Offroad.EditorTools
             return prefab;
         }
 
+        // ------------------------------------------------------------------ landmarks
+
+        static readonly HashSet<string> SmallLandmarkPieces = new HashSet<string> { "FireRing", "Crates", "Signpost", "Tent", "Cairn" };
+
+        static void PlaceLandmarks(Terrain terrain, RegionInfo info)
+        {
+            if (info.landmarks == null) return;
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(LandmarksModel);
+            if (model == null) throw new Exception("Landmarks model missing: " + LandmarksModel);
+            var prefabs = new Dictionary<string, GameObject>();
+            var root = new GameObject("Landmarks").transform;
+
+            foreach (var l in info.landmarks)
+            {
+                var go = new GameObject(l.name);
+                go.transform.SetParent(root, false);
+                var centre = new Vector3(l.x, 0f, l.z);
+                centre.y = terrain.SampleHeight(centre) + terrain.transform.position.y;
+                go.transform.position = centre;
+                var marker = go.AddComponent<Landmark>();
+                marker.id = l.id;
+                marker.displayName = l.name;
+                marker.discoverRadius = l.discoverRadius;
+                marker.reward = l.id == "basecamp" ? 0 : 150;
+                foreach (var piece in l.pieces ?? Array.Empty<PieceInfo>())
+                    PlacePiece(terrain, model, prefabs, piece, go.transform);
+            }
+
+            var markers = new GameObject("Trail Markers").transform;
+            foreach (var m in info.markers ?? Array.Empty<PieceInfo>())
+                PlacePiece(terrain, model, prefabs, m, markers);
+            Debug.Log($"[Offroad] Placed {info.landmarks.Length} landmarks and {info.markers?.Length ?? 0} trail markers");
+        }
+
+        static void PlacePiece(Terrain terrain, GameObject model, Dictionary<string, GameObject> prefabs, PieceInfo p, Transform parent)
+        {
+            if (!prefabs.TryGetValue(p.model, out var prefab))
+            {
+                prefab = CreateLandmarkPrefab(model, p.model);
+                prefabs[p.model] = prefab;
+            }
+            if (prefab == null) return;
+            var pos = new Vector3(p.x, 0f, p.z);
+            pos.y = terrain.SampleHeight(pos) + terrain.transform.position.y - p.sink;
+            var td = terrain.terrainData;
+            Vector3 n = td.GetInterpolatedNormal(p.x / td.size.x, p.z / td.size.z);
+            Quaternion tilt = Quaternion.FromToRotation(Vector3.up, Vector3.Slerp(Vector3.up, n, p.align));
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            inst.transform.SetPositionAndRotation(pos, tilt * Quaternion.Euler(0f, p.yaw, 0f));
+        }
+
+        static GameObject CreateLandmarkPrefab(GameObject model, string name)
+        {
+            var src = model.transform.Find(name);
+            if (src == null) { Debug.LogWarning($"[Offroad] Landmark mesh {name} not found"); return null; }
+            bool small = SmallLandmarkPieces.Contains(name);
+            var go = new GameObject(name);
+            var renderers = new List<Renderer> { AddMesh(go, src) };
+            go.AddComponent<MeshCollider>().sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+
+            if (name == "Windmill")
+            {
+                var rotorSrc = model.transform.Find("Windmill_Rotor");
+                if (rotorSrc != null)
+                {
+                    var rotor = new GameObject("Rotor");
+                    rotor.transform.SetParent(go.transform, false);
+                    rotor.transform.localPosition = rotorSrc.localPosition - src.localPosition;
+                    rotor.transform.localRotation = rotorSrc.localRotation;
+                    renderers.Add(AddMesh(rotor, rotorSrc));
+                    rotor.AddComponent<WindmillRotor>();
+                }
+            }
+
+            var lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(small ? 0.01f : 0.0012f, renderers.ToArray()) });
+            lod.fadeMode = LODFadeMode.None;
+            Directory.CreateDirectory($"{PrefabDir}/Landmarks");
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Landmarks/{name}.prefab");
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        static Renderer AddMesh(GameObject go, Transform src)
+        {
+            go.AddComponent<MeshFilter>().sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterials = MaterialLibrary.Remap(src.GetComponent<MeshRenderer>().sharedMaterials);
+            return mr;
+        }
+
         // ------------------------------------------------------------------ vehicle
 
         static OffroadVehicle CreateVehicle(Terrain terrain, RegionInfo info)
@@ -354,6 +460,7 @@ namespace Offroad.EditorTools
             var hud = go.AddComponent<Hud>();
             hud.vehicle = vehicle;
             hud.menu = menu;
+            go.AddComponent<DiscoveryTracker>().player = vehicle.transform;
         }
 
         static T ReadJson<T>(string path) => JsonUtility.FromJson<T>(File.ReadAllText(path));

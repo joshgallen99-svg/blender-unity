@@ -145,6 +145,18 @@ jobs:
           versioning: None
           allowDirtyBuild: true
 
+      - name: Ad-hoc sign the app (Apple Silicon refuses unsigned native code)
+        continue-on-error: true
+        run: |
+          APP=$(sudo find build -maxdepth 4 -name "*.app" -type d | head -1)
+          sudo chown -R "$(id -u)" build
+          V=0.27.0
+          curl -fsSL "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${V}/apple-codesign-${V}-x86_64-unknown-linux-musl.tar.gz" | tar -xz -C "$RUNNER_TEMP" \
+            || cargo install --quiet apple-codesign --root "$RUNNER_TEMP/rcs"
+          RCS=$(find "$RUNNER_TEMP" -type f -name rcodesign | head -1)
+          "$RCS" sign "$APP"
+          echo "Signed $APP"
+
       - name: Package app (tar keeps the executable bit)
         run: |
           APP=$(sudo find build -maxdepth 4 -name "*.app" -type d | head -1)

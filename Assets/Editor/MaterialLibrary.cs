@@ -46,22 +46,84 @@ namespace Offroad.EditorTools
             ["Canvas"] = new Spec(0.45f, 0.38f, 0.26f, 0f, 0.9f),
             ["Tire"] = new Spec(0.03f, 0.03f, 0.03f, 0f, 0.92f),
             ["Rim"] = new Spec(0.36f, 0.27f, 0.15f, 0.85f, 0.35f),
-            ["RockRed"] = new Spec(0.42f, 0.19f, 0.11f, 0f, 0.88f, 0f, true),
-            ["RockPale"] = new Spec(0.62f, 0.42f, 0.29f, 0f, 0.9f, 0f, true),
-            ["RockDust"] = new Spec(0.78f, 0.55f, 0.36f, 0f, 0.95f, 0f, true),
-            ["Foliage"] = new Spec(0.26f, 0.31f, 0.15f, 0f, 0.8f, 0f, true),
-            ["FoliageDry"] = new Spec(0.45f, 0.39f, 0.22f, 0f, 0.85f, 0f, true),
             ["Yucca"] = new Spec(0.25f, 0.36f, 0.27f, 0f, 0.6f, 0f, true),
             ["Bark"] = new Spec(0.33f, 0.28f, 0.23f, 0f, 0.9f, 0f, true),
+            ["BarkBleached"] = new Spec(0.55f, 0.50f, 0.44f, 0f, 0.85f, 0f, true),
+            ["Ash"] = new Spec(0.05f, 0.045f, 0.04f, 0f, 0.95f, 0f, true),
         };
 
         static readonly Dictionary<string, Material> Cache = new Dictionary<string, Material>();
+
+        // Materials that use the project's custom shaders instead of URP Lit.
+        static readonly Dictionary<string, System.Func<Material>> Custom = new Dictionary<string, System.Func<Material>>
+        {
+            ["RockSandstone"] = () => Rock("RockSandstone", new Color(1.08f, 1.02f, 0.98f), 0.35f),
+            ["RockPale"] = () => Rock("RockPale", new Color(1.55f, 1.38f, 1.2f), 0.22f),
+            ["Leaves"] = () => Foliage("Leaves", "ScrubLeaves", 0.07f, 1.4f),
+            ["LeavesFlowering"] = () => Foliage("LeavesFlowering", "ScrubFlowering", 0.07f, 1.3f),
+            ["GrassCards"] = () => Foliage("GrassCards", "DryGrass", 0.14f, 0.7f),
+            ["Wood"] = () => Textured("Wood", "Wood", Color.white, 0f, 0.12f),
+            ["WoodDark"] = () => Textured("WoodDark", "Wood", new Color(0.55f, 0.5f, 0.46f), 0f, 0.1f),
+            ["Rust"] = () => Textured("Rust", "Rust", Color.white, 0.25f, 0.22f),
+            ["Galvanized"] = () => Textured("Galvanized", "Galvanized", Color.white, 0.65f, 0.45f),
+            ["Canvas"] = () => Textured("Canvas", "Canvas", Color.white, 0f, 0.08f, 0.5f),
+        };
+
+        /// <summary>URP Lit with a tiling albedo + normal map (UVs are in metres, from Blender box projection).</summary>
+        static Material Textured(string name, string texture, Color tint, float metallic, float smoothness, float tiling = 1f)
+        {
+            var m = LoadOrCreate($"{Dir}/{name}.mat", LitShader);
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/Textures/Materials/{texture}_albedo.png"));
+            m.SetTextureScale("_BaseMap", new Vector2(tiling, tiling));
+            var normal = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/Textures/Materials/{texture}_normal.png");
+            m.SetTexture("_BumpMap", normal);
+            m.SetFloat("_BumpScale", 1f);
+            if (normal) m.EnableKeyword("_NORMALMAP");
+            m.SetColor("_BaseColor", tint);
+            m.SetFloat("_Metallic", metallic);
+            m.SetFloat("_Smoothness", smoothness);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        static Material Rock(string name, Color tint, float strata)
+        {
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/RockTriplanar");
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/RedRock_albedo.png"));
+            m.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/RedRock_normal.png"));
+            m.SetTexture("_TopMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/Sand_albedo.png"));
+            m.SetTexture("_TopNormal", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/Sand_normal.png"));
+            m.SetColor("_BaseColor", tint);
+            m.SetColor("_TopColor", new Color(1.05f, 1.0f, 0.95f));
+            m.SetFloat("_Scale", 5f);
+            m.SetFloat("_TopScale", 9f);
+            m.SetFloat("_StrataStrength", strata);
+            m.SetFloat("_TopAmount", 0.42f);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        static Material Foliage(string name, string texture, float wind, float windHeight)
+        {
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Foliage");
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/Textures/Foliage/{texture}.png"));
+            m.SetColor("_BaseColor", Color.white);
+            m.SetFloat("_Cutoff", 0.45f);
+            m.SetFloat("_WindStrength", wind);
+            m.SetFloat("_WindHeight", windHeight);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
 
         public static void EnsureAll()
         {
             Cache.Clear();
             Directory.CreateDirectory(Dir);
             foreach (var kv in Specs) Get(kv.Key);
+            foreach (var kv in Custom) Get(kv.Key);
             AssetDatabase.SaveAssets();
         }
 
@@ -69,6 +131,12 @@ namespace Offroad.EditorTools
         public static Material Get(string name)
         {
             if (Cache.TryGetValue(name, out var m) && m) return m;
+            if (Custom.TryGetValue(name, out var make))
+            {
+                m = make();
+                Cache[name] = m;
+                return m;
+            }
             if (!Specs.TryGetValue(name, out var spec))
             {
                 Debug.LogWarning($"MaterialLibrary: no spec for '{name}', using grey.");
