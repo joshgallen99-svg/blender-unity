@@ -162,11 +162,21 @@ namespace Offroad.Settings
             }
 
             QualitySettings.lodBias = s.detail;
+            // Native builds cap with v-sync (even frame pacing, and the GPU idles between frames instead of
+            // racing ahead); the browser ignores v-sync, so WebGL uses the frame-rate target.
+            bool web = Application.platform == RuntimePlatform.WebGLPlayer;
+            int hz = Mathf.Max(30, Mathf.RoundToInt((float)Screen.currentResolution.refreshRateRatio.value));
             switch (s.frameCap)
             {
-                case FrameCap.Fps30: QualitySettings.vSyncCount = 0; Application.targetFrameRate = 30; break;
-                case FrameCap.Fps60: QualitySettings.vSyncCount = 0; Application.targetFrameRate = 60; break;
-                default: QualitySettings.vSyncCount = 1; Application.targetFrameRate = -1; break;
+                case FrameCap.Fps30:
+                    QualitySettings.vSyncCount = web ? 0 : Mathf.Clamp(hz / 30, 1, 4);
+                    Application.targetFrameRate = 30;
+                    break;
+                case FrameCap.Fps60:
+                    QualitySettings.vSyncCount = web ? 0 : Mathf.Clamp(hz / 60, 1, 4);
+                    Application.targetFrameRate = 60;
+                    break;
+                default: QualitySettings.vSyncCount = 0; Application.targetFrameRate = -1; break;
             }
 
             RenderSettings.fogStartDistance = s.viewDistance * 0.3f;   // keep mid-distance rock crisp
