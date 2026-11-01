@@ -136,7 +136,9 @@ namespace Offroad.World
                 {
                     if (!w.grounded || w.load <= 1f) { _last.Remove(w); continue; }
                     Vector3 p = w.contactPoint;
-                    if (!_last.TryGetValue(w, out var a) || (a - p).sqrMagnitude > 4f) a = p;
+                    bool seen = _last.TryGetValue(w, out var a);
+                    if (seen && (a - p).sqrMagnitude < 0.0004f && w.slip < 0.05f) continue;   // parked: already stamped
+                    if (!seen || (a - p).sqrMagnitude > 4f) a = p;
                     _last[w] = p;
                     float pressure = Mathf.Clamp01(0.55f + 0.45f * w.load / staticLoad);
                     Vector3 heading = w.front ? Quaternion.AngleAxis(v.SteerAngle, Vector3.up) * v.transform.forward : v.transform.forward;

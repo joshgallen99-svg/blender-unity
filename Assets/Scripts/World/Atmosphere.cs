@@ -76,6 +76,7 @@ namespace Offroad.World
             bloom.scatter.Override(0.7f);
             bloom.tint.Override(new Color(1f, 0.92f, 0.82f));
             bloom.highQualityFiltering.Override(false);
+            bloom.downscale.Override(BloomDownscaleMode.Quarter);   // a soft glow looks the same from quarter res
 
             var vig = profile.Add<Vignette>(true);
             vig.intensity.Override(vignette);

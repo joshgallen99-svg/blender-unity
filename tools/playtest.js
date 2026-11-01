@@ -9,6 +9,8 @@
 //     mouse:<dx>:<dy>    move the mouse by a delta (camera orbit)
 //   Example: "wait:15000,shot:start,down:KeyW,wait:4000,shot:driving,up:KeyW"
 // Also writes console.log (browser console) and fps.txt (requestAnimationFrame rate samples).
+// Env: CANVAS_W/CANVAS_H canvas size (default 640x400), VIEW_W/VIEW_H page size, SHOT_CANVAS=1 to
+// capture only the game canvas.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -39,7 +41,9 @@ const server = http.createServer((req, res) => {
   const browser = await chromium.launch({
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
   });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const viewW = Number(process.env.VIEW_W || 1280), viewH = Number(process.env.VIEW_H || 720);
+  const page = await browser.newPage({ viewport: { width: viewW, height: viewH } });
+  const canvasOnly = process.env.SHOT_CANVAS === '1';     // screenshot just the game canvas
   const logs = [];
   page.on('console', m => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', e => logs.push(`[pageerror] ${e.message}`));
@@ -64,7 +68,12 @@ const server = http.createServer((req, res) => {
     else if (cmd === 'down') await page.keyboard.down(a);
     else if (cmd === 'up') await page.keyboard.up(a);
     else if (cmd === 'press') await page.keyboard.press(a);
-    else if (cmd === 'shot') await page.screenshot({ path: path.join(outDir, `${a}.png`), timeout: 240000 }).catch(e => console.warn('shot failed', a, e.message));
+    else if (cmd === 'shot') {
+      const file = path.join(outDir, `${a}.png`);
+      const shot = canvasOnly ? page.locator('#unity-canvas').screenshot({ path: file, timeout: 240000 })
+                              : page.screenshot({ path: file, timeout: 240000 });
+      await shot.catch(e => console.warn('shot failed', a, e.message));
+    }
     else if (cmd === 'mouse') { await page.mouse.move(640, 360); await page.mouse.move(640 + Number(a), 360 + Number(b), { steps: 10 }); }
     else console.warn('Unknown step', step);
   }
