@@ -49,6 +49,29 @@ namespace Offroad.World
         }
 
         readonly List<Chunk> _chunks = new List<Chunk>();
+        readonly List<Matrix4x4>[] _split = { new List<Matrix4x4>(1023), new List<Matrix4x4>(1023), new List<Matrix4x4>(1023) };
+
+        static int Level(float d, float lodD, float lod2D) => d < lodD ? 0 : d < lod2D ? 1 : 2;
+
+        void DrawLevel(InstancePrototype p, int level, Chunk c, Matrix4x4[] all, List<Matrix4x4> some, bool shadows)
+        {
+            var mesh = level == 0 ? p.mesh : level == 1 ? p.lodMesh : p.lod2Mesh;
+            var mats = level == 2 ? p.lod2Materials : p.materials;
+            if (mesh == null || mats == null) return;
+            if (level == 2) shadows = false;          // impostors are far beyond the shadow range anyway
+            for (int s = 0; s < mesh.subMeshCount && s < mats.Length; s++)
+            {
+                var rp = new RenderParams(mats[s])
+                {
+                    worldBounds = c.bounds,
+                    shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off,
+                    receiveShadows = true,
+                    layer = gameObject.layer,
+                };
+                if (all != null) Graphics.RenderMeshInstanced(rp, mesh, s, all);
+                else Graphics.RenderMeshInstanced(rp, mesh, s, some);
+            }
+        }
         readonly Plane[] _planes = new Plane[6];
 
         /// <summary>Instances drawn last frame (for the performance overlay and tests).</summary>
@@ -143,28 +166,29 @@ namespace Offroad.World
                 float d2 = c.bounds.SqrDistance(eye);
                 if (d2 > maxD * maxD || d2 > farSq) continue;
                 if (!GeometryUtility.TestPlanesAABB(_planes, c.bounds)) continue;
-                float lodD = c.proto.lodDistance * detail;
-                float lod2D = c.proto.lod2Distance * detail;
-                var mesh = c.proto.lodMesh != null && d2 > lodD * lodD ? c.proto.lodMesh : c.proto.mesh;
-                var mats = c.proto.materials;
-                if (c.proto.lod2Mesh != null && c.proto.lod2Materials != null && d2 > lod2D * lod2D)
-                {
-                    mesh = c.proto.lod2Mesh;
-                    mats = c.proto.lod2Materials;
-                }
-                bool shadows = c.proto.castShadows && d2 < shadowSq;
+                var p = c.proto;
+                float lodD = p.lodMesh != null ? p.lodDistance * detail : float.MaxValue;
+                float lod2D = p.lod2Mesh != null && p.lod2Materials != null ? p.lod2Distance * detail : float.MaxValue;
+                float far = Vector3.Distance(c.bounds.center, eye) + c.bounds.extents.magnitude;
+                int lo = Level(Mathf.Sqrt(d2), lodD, lod2D), hi = Level(far, lodD, lod2D);
+                bool shadows = p.castShadows && d2 < shadowSq;
                 drawn += c.matrices.Length;
-                for (int s = 0; s < mesh.subMeshCount && s < mats.Length; s++)
+                if (lo == hi)
                 {
-                    var rp = new RenderParams(mats[s])
-                    {
-                        worldBounds = c.bounds,
-                        shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off,
-                        receiveShadows = true,
-                        layer = gameObject.layer,
-                    };
-                    Graphics.RenderMeshInstanced(rp, mesh, s, c.matrices);
+                    DrawLevel(p, lo, c, c.matrices, null, shadows);
+                    continue;
                 }
+                // The chunk straddles a detail boundary: sort its instances by distance (no allocation).
+                _split[0].Clear(); _split[1].Clear(); _split[2].Clear();
+                float l1 = lodD * lodD, l2 = lod2D * lod2D;
+                foreach (var m in c.matrices)
+                {
+                    Vector3 pos = m.GetColumn(3);
+                    float dd = (pos - eye).sqrMagnitude;
+                    _split[dd < l1 ? 0 : dd < l2 ? 1 : 2].Add(m);
+                }
+                for (int level = lo; level <= hi; level++)
+                    if (_split[level].Count > 0) DrawLevel(p, level, c, null, _split[level], shadows);
             }
             DrawnInstances = drawn;
         }
