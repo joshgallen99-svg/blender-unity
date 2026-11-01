@@ -16,7 +16,6 @@ Shader "Offroad/ForestTerrain"
         [Normal] _SoilNrm ("Soil Normal", 2D) = "bump" {}
         _GravelTex ("River Gravel", 2D) = "white" {}
         [Normal] _GravelNrm ("River Gravel Normal", 2D) = "bump" {}
-        _WetMudTex ("Wet Mud", 2D) = "white" {}
         _RockTex ("Granite", 2D) = "white" {}
         [Normal] _RockNrm ("Granite Normal", 2D) = "bump" {}
         _FloorScale ("Forest Floor Tile (m)", Float) = 4
@@ -62,19 +61,21 @@ Shader "Offroad/ForestTerrain"
             #include "Desert.hlsl"
             #include "Trails.hlsl"
 
+            // One shared repeat sampler for all tiling textures: WebGL allows only 16 sampler slots and
+            // the shadow map, mask, hazard and trail maps need theirs.
             TEXTURE2D(_Mask); SAMPLER(sampler_Mask);
-            TEXTURE2D(_Macro); SAMPLER(sampler_Macro);
             TEXTURE2D(_FloorTex); SAMPLER(sampler_FloorTex);
-            TEXTURE2D(_FloorNrm); SAMPLER(sampler_FloorNrm);
-            TEXTURE2D(_MeadowTex); SAMPLER(sampler_MeadowTex);
-            TEXTURE2D(_MeadowNrm); SAMPLER(sampler_MeadowNrm);
-            TEXTURE2D(_SoilTex); SAMPLER(sampler_SoilTex);
-            TEXTURE2D(_SoilNrm); SAMPLER(sampler_SoilNrm);
-            TEXTURE2D(_GravelTex); SAMPLER(sampler_GravelTex);
-            TEXTURE2D(_GravelNrm); SAMPLER(sampler_GravelNrm);
-            TEXTURE2D(_WetMudTex); SAMPLER(sampler_WetMudTex);
-            TEXTURE2D(_RockTex); SAMPLER(sampler_RockTex);
-            TEXTURE2D(_RockNrm); SAMPLER(sampler_RockNrm);
+            TEXTURE2D(_Macro);
+            TEXTURE2D(_FloorNrm);
+            TEXTURE2D(_MeadowTex);
+            TEXTURE2D(_MeadowNrm);
+            TEXTURE2D(_SoilTex);
+            TEXTURE2D(_SoilNrm);
+            TEXTURE2D(_GravelTex);
+            TEXTURE2D(_GravelNrm);
+            TEXTURE2D(_RockTex);
+            TEXTURE2D(_RockNrm);
+            #define S_REPEAT sampler_FloorTex
 
             struct Attributes
             {
@@ -117,9 +118,9 @@ Shader "Offroad/ForestTerrain"
                 float3 p = i.positionWS;
                 half3 n = normalize(i.normalWS);
                 half4 mask = SAMPLE_TEXTURE2D(_Mask, sampler_Mask, i.uvFog.xy);
-                half4 macro = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 256.0);
-                half4 macro2 = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 37.0 + 0.37);
-                half4 macroS = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, p.xz / 9.0 + 0.13);
+                half4 macro = SAMPLE_TEXTURE2D(_Macro, S_REPEAT, p.xz / 256.0);
+                half4 macro2 = SAMPLE_TEXTURE2D(_Macro, S_REPEAT, p.xz / 37.0 + 0.37);
+                half4 macroS = SAMPLE_TEXTURE2D(_Macro, S_REPEAT, p.xz / 9.0 + 0.13);
                 float2 dpx = ddx(p.xz);
                 float2 dpy = ddy(p.xz);
                 half4 w = max(mask, 0.0001);
@@ -135,13 +136,13 @@ Shader "Offroad/ForestTerrain"
                 half4 soilC = half4(0.20, 0.13, 0.09, 0.5), gravelC = half4(0.45, 0.42, 0.37, 0.5);
                 half3 floorN = half3(0, 0, 1), meadowN = half3(0, 0, 1), soilN = half3(0, 0, 1), gravelN = half3(0, 0, 1);
                 [branch] if (w.x > 0.004)
-                    GroundLayer(TEXTURE2D_ARGS(_FloorTex, sampler_FloorTex), TEXTURE2D_ARGS(_FloorNrm, sampler_FloorNrm), p.xz, dpx, dpy, _FloorScale, 0.0, 0.6, floorC, floorN);
+                    GroundLayer(TEXTURE2D_ARGS(_FloorTex, sampler_FloorTex), TEXTURE2D_ARGS(_FloorNrm, S_REPEAT), p.xz, dpx, dpy, _FloorScale, 0.0, 0.6, floorC, floorN);
                 [branch] if (w.y > 0.004)
-                    GroundLayer(TEXTURE2D_ARGS(_MeadowTex, sampler_MeadowTex), TEXTURE2D_ARGS(_MeadowNrm, sampler_MeadowNrm), p.xz, dpx, dpy, _MeadowScale, 0.43, 0.5, meadowC, meadowN);
+                    GroundLayer(TEXTURE2D_ARGS(_MeadowTex, S_REPEAT), TEXTURE2D_ARGS(_MeadowNrm, S_REPEAT), p.xz, dpx, dpy, _MeadowScale, 0.43, 0.5, meadowC, meadowN);
                 [branch] if (w.z > 0.004 || hz.r > 0.01)
-                    GroundLayer(TEXTURE2D_ARGS(_SoilTex, sampler_SoilTex), TEXTURE2D_ARGS(_SoilNrm, sampler_SoilNrm), p.xz, dpx, dpy, _SoilScale, 0.17, 0.6, soilC, soilN);
+                    GroundLayer(TEXTURE2D_ARGS(_SoilTex, S_REPEAT), TEXTURE2D_ARGS(_SoilNrm, S_REPEAT), p.xz, dpx, dpy, _SoilScale, 0.17, 0.6, soilC, soilN);
                 [branch] if (w.w > 0.004)
-                    GroundLayer(TEXTURE2D_ARGS(_GravelTex, sampler_GravelTex), TEXTURE2D_ARGS(_GravelNrm, sampler_GravelNrm), p.xz, dpx, dpy, _GravelScale, 0.71, 0.75, gravelC, gravelN);
+                    GroundLayer(TEXTURE2D_ARGS(_GravelTex, S_REPEAT), TEXTURE2D_ARGS(_GravelNrm, S_REPEAT), p.xz, dpx, dpy, _GravelScale, 0.71, 0.75, gravelC, gravelN);
 
                 // Height blend: moss and litter sit on top, soil shows through in the low spots.
                 half4 hb = w + half4(floorC.a, meadowC.a * 0.8, soilC.a * 0.6, gravelC.a) * _BlendDepth * 2.0 + (macro2.b - 0.5) * 0.15;
@@ -164,8 +165,8 @@ Shader "Offroad/ForestTerrain"
                 [branch] if (rockW > 0.002)
                 {
                     half3 tw = TriplanarWeights(n, 4);
-                    rockTex = TriplanarSampleGrad(TEXTURE2D_ARGS(_RockTex, sampler_RockTex), pr, prdx, prdy, tw);
-                    rockNormal = TriplanarNormalGrad(TEXTURE2D_ARGS(_RockNrm, sampler_RockNrm), pr, prdx, prdy, n, tw, _NormalStrength);
+                    rockTex = TriplanarSampleGrad(TEXTURE2D_ARGS(_RockTex, S_REPEAT), pr, prdx, prdy, tw);
+                    rockNormal = TriplanarNormalGrad(TEXTURE2D_ARGS(_RockNrm, S_REPEAT), pr, prdx, prdy, n, tw, _NormalStrength);
                 }
                 half3 rockCol = rockTex.rgb * lerp(0.85, 1.05, macro2.r);
                 half mossOnRock = smoothstep(0.55, 0.3, steep) * smoothstep(0.35, 0.65, macro2.g + (rockTex.a - 0.5) * 0.4);
@@ -191,11 +192,8 @@ Shader "Offroad/ForestTerrain"
                 float tm = _Time.y;
                 albedo *= 1.0 - 0.3 * damp;
                 smooth += 0.12 * damp;
-                [branch] if (mudW > 0.002)
-                {
-                    half4 wm = SAMPLE_TEXTURE2D_GRAD(_WetMudTex, sampler_WetMudTex, p.xz / _SoilScale, dpx / _SoilScale, dpy / _SoilScale);
-                    albedo = lerp(albedo, wm.rgb * lerp(0.8, 1.05, macroS.b), mudW);
-                }
+                // Wet mud: the soil (always sampled where there is mud) smeared dark and glossy.
+                albedo = lerp(albedo, soilC.rgb * half3(0.5, 0.47, 0.44) * lerp(0.8, 1.05, macroS.b), mudW);
                 smooth = lerp(smooth, 0.6, mudW);
                 normalWS = normalize(lerp(normalWS, n, mudW * 0.6));
                 half3 wn = half3(sin(p.x * 3.1 + tm * 1.7) + sin(p.z * 2.3 - tm * 1.3), 0,

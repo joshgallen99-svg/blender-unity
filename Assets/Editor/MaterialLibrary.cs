@@ -180,7 +180,6 @@ namespace Offroad.EditorTools
             m.SetTexture("_SoilNrm", Tex("ForestSoil_normal"));
             m.SetTexture("_GravelTex", Tex("RiverGravel_albedo"));
             m.SetTexture("_GravelNrm", Tex("RiverGravel_normal"));
-            m.SetTexture("_WetMudTex", Tex("ForestMud_albedo"));
             m.SetTexture("_RockTex", Tex("Granite_albedo"));
             m.SetTexture("_RockNrm", Tex("Granite_normal"));
             EditorUtility.SetDirty(m);
