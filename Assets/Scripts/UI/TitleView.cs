@@ -126,8 +126,17 @@ namespace Offroad.UI
         public void Show()
         {
             _list.Clear();
+            foreach (var region in Regions.Order)
             foreach (var m in Missions.All)
             {
+                if (m.region != region) continue;
+                if (m == System.Array.Find(Missions.All, x => x.region == region))
+                {
+                    var header = UIKit.Box("region-header", "slide-left");
+                    header.Add(UIKit.Heading(Regions.Title(region), "h3"));
+                    header.Add(UIKit.SubHeading(Regions.Subtitle(region), "small", "muted"));
+                    _list.Add(header);
+                }
                 var card = UIKit.Box("mission-card", "slide-left");
                 var col = UIKit.Box();
                 col.style.flexGrow = 1;
@@ -155,7 +164,9 @@ namespace Offroad.UI
             }
             UIKit.Show(Root);
             UIKit.Stagger(_list.contentContainer, 60, 100);
-            Select(_selected ?? Array.Find(Missions.All, x => !Progress.IsMissionDone(x.id)) ?? Missions.All[0]);
+            string here = _ui.flow ? _ui.flow.regionId : Regions.Desert;
+            Select(_selected ?? Array.Find(Missions.All, x => x.region == here && !Progress.IsMissionDone(x.id))
+                   ?? Array.Find(Missions.All, x => x.region == here) ?? Missions.All[0]);
         }
 
         void Select(MissionDef m)

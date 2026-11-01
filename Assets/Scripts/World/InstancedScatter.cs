@@ -19,6 +19,13 @@ namespace Offroad.World
         [Tooltip("Optional low-detail mesh used for chunks further than lodDistance.")]
         public Mesh lodMesh;
         public float lodDistance = 60f;
+        [Tooltip("Optional far mesh (e.g. impostor cards) with its own materials, beyond lod2Distance.")]
+        public Mesh lod2Mesh;
+        public Material[] lod2Materials;
+        public float lod2Distance = 250f;
+        [Tooltip("Trunk collider (capsule) created at load for every instance; 0 = none.")]
+        public float colliderRadius;
+        public float colliderHeight = 4f;
         // Per instance: position (3), yaw degrees, scale, up-vector x, up-vector z  = 7 floats.
         public float[] data = Array.Empty<float>();
         public int Count => data.Length / 7;
@@ -47,7 +54,39 @@ namespace Offroad.World
         /// <summary>Instances drawn last frame (for the performance overlay and tests).</summary>
         public int DrawnInstances { get; private set; }
 
-        void Awake() => Build();
+        void Awake()
+        {
+            Build();
+            BuildColliders();
+        }
+
+        /// <summary>Static capsule colliders for trunks (trees), created at load from the instance data.</summary>
+        void BuildColliders()
+        {
+            Transform root = null;
+            foreach (var p in prototypes)
+            {
+                if (p.colliderRadius <= 0f) continue;
+                if (root == null)
+                {
+                    root = new GameObject("Trunk Colliders").transform;
+                    root.SetParent(transform, false);
+                }
+                for (int i = 0; i < p.Count; i++)
+                {
+                    int o = i * 7;
+                    float s = p.data[o + 4];
+                    var go = new GameObject(p.name);
+                    go.transform.SetParent(root, false);
+                    go.transform.position = new Vector3(p.data[o], p.data[o + 1], p.data[o + 2]);
+                    var cap = go.AddComponent<CapsuleCollider>();
+                    cap.radius = p.colliderRadius * s;
+                    cap.height = p.colliderHeight * s;
+                    cap.center = new Vector3(0f, cap.height * 0.5f, 0f);
+                    go.isStatic = true;
+                }
+            }
+        }
 
         public void Build()
         {
@@ -105,12 +144,19 @@ namespace Offroad.World
                 if (d2 > maxD * maxD || d2 > farSq) continue;
                 if (!GeometryUtility.TestPlanesAABB(_planes, c.bounds)) continue;
                 float lodD = c.proto.lodDistance * detail;
+                float lod2D = c.proto.lod2Distance * detail;
                 var mesh = c.proto.lodMesh != null && d2 > lodD * lodD ? c.proto.lodMesh : c.proto.mesh;
+                var mats = c.proto.materials;
+                if (c.proto.lod2Mesh != null && c.proto.lod2Materials != null && d2 > lod2D * lod2D)
+                {
+                    mesh = c.proto.lod2Mesh;
+                    mats = c.proto.lod2Materials;
+                }
                 bool shadows = c.proto.castShadows && d2 < shadowSq;
                 drawn += c.matrices.Length;
-                for (int s = 0; s < mesh.subMeshCount && s < c.proto.materials.Length; s++)
+                for (int s = 0; s < mesh.subMeshCount && s < mats.Length; s++)
                 {
-                    var rp = new RenderParams(c.proto.materials[s])
+                    var rp = new RenderParams(mats[s])
                     {
                         worldBounds = c.bounds,
                         shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off,

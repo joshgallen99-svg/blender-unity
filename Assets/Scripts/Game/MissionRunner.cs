@@ -68,7 +68,8 @@ namespace Offroad.Game
                     var l = FindLandmark(Active.targets[Step]);
                     return l ? $"Reach {l.displayName}" : "Reach the objective";
                 }
-                return "Return to Base Camp";
+                var camp = FindLandmark(Active.camp);
+                return camp ? $"Return to {camp.displayName}" : "Return to camp";
             }
         }
 
@@ -78,7 +79,7 @@ namespace Offroad.Game
             get
             {
                 if (!Running || Active.freeRoam) return null;
-                string id = Step < Active.targets.Length ? Active.targets[Step] : "basecamp";
+                string id = Step < Active.targets.Length ? Active.targets[Step] : Active.camp;
                 var l = FindLandmark(id);
                 return l ? l.transform.position : (Vector3?)null;
             }
@@ -104,7 +105,7 @@ namespace Offroad.Game
             if (target == null) return;
             Vector3 d = target.Value - vehicle.transform.position;
             d.y = 0f;
-            string id = Step < Active.targets.Length ? Active.targets[Step] : "basecamp";
+            string id = Step < Active.targets.Length ? Active.targets[Step] : Active.camp;
             var lm = FindLandmark(id);
             float radius = lm ? Mathf.Max(arriveRadius, lm.discoverRadius * 0.6f) : arriveRadius;
             if (d.magnitude > radius) return;

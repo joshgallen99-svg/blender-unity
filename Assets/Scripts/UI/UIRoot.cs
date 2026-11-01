@@ -132,6 +132,18 @@ namespace Offroad.UI
 
         public void HidePause() => _pause?.Hide();
 
+        /// <summary>Full-screen "travelling to ..." card while the next region's scene loads.</summary>
+        public void ShowLoading(string regionTitle)
+        {
+            if (!EnsureBuilt()) return;
+            HideScreens(null);
+            var card = UIKit.Box("loading");
+            card.Add(UIKit.SubHeading("Travelling to", "kicker"));
+            card.Add(UIKit.Heading(regionTitle, "h1"));
+            _root.Add(card);
+            UIKit.Show(card);
+        }
+
         public void ShowResults(MissionDef m)
         {
             if (!EnsureBuilt()) return;

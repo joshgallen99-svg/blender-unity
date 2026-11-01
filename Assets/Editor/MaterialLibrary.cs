@@ -50,6 +50,8 @@ namespace Offroad.EditorTools
             ["Bark"] = new Spec(0.33f, 0.28f, 0.23f, 0f, 0.9f, 0f, true),
             ["BarkBleached"] = new Spec(0.55f, 0.50f, 0.44f, 0f, 0.85f, 0f, true),
             ["Ash"] = new Spec(0.05f, 0.045f, 0.04f, 0f, 0.95f, 0f, true),
+            ["WoodEnd"] = new Spec(0.62f, 0.48f, 0.33f, 0f, 0.8f, 0f, true),
+            ["BarkAspen"] = new Spec(0.80f, 0.78f, 0.71f, 0f, 0.75f, 0f, true),
         };
 
         static readonly Dictionary<string, Material> Cache = new Dictionary<string, Material>();
@@ -60,6 +62,17 @@ namespace Offroad.EditorTools
             ["RockSandstone"] = () => Rock("RockSandstone", Color.white, 0.32f),
             ["RockPale"] = () => Rock("RockPale", new Color(1.12f, 1.08f, 1.04f), 0.4f),
             ["Leaves"] = () => Foliage("Leaves", "ScrubLeaves", 0.07f, 1.4f),
+            // Forest valley.
+            ["BarkFir"] = () => Textured("BarkFir", "BarkFir", Color.white, 0f, 0.08f),
+            ["BarkDead"] = () => Textured("BarkDead", "BarkFir", new Color(0.78f, 0.78f, 0.8f), 0f, 0.06f),
+            ["FirNeedles"] = () => Foliage("FirNeedles", "FirBranch", 0.03f, 18f),
+            ["FirImpostor"] = () => Foliage("FirImpostor", "FirImpostors", 0.012f, 22f),
+            ["AspenLeaves"] = () => Foliage("AspenLeaves", "ScrubLeaves", 0.08f, 10f, new Color(1.05f, 1.3f, 0.72f)),
+            ["BushLeaves"] = () => Foliage("BushLeaves", "ScrubLeaves", 0.06f, 1.5f, new Color(0.78f, 1.12f, 0.72f)),
+            ["Fern"] = () => Foliage("Fern", "Fern", 0.06f, 1f),
+            ["MeadowGrass"] = () => Foliage("MeadowGrass", "MeadowGrass", 0.14f, 0.8f),
+            ["Wildflowers"] = () => Foliage("Wildflowers", "Wildflowers", 0.14f, 0.7f),
+            ["Granite"] = () => ForestRock(),
             ["LeavesFlowering"] = () => Foliage("LeavesFlowering", "ScrubFlowering", 0.07f, 1.3f),
             ["GrassCards"] = () => Foliage("GrassCards", "DryGrass", 0.14f, 0.7f),
             ["Wood"] = () => Textured("Wood", "Wood", Color.white, 0f, 0.12f),
@@ -131,9 +144,78 @@ namespace Offroad.EditorTools
             return m;
         }
 
-        public static Material Backdrop(string name, Color lit, Color shadow, Color haze, float hazeAmount, float hazeHeight)
+        /// <summary>Granite rocks and cliffs: triplanar granite, moss on top, mossy skirt at the ground.</summary>
+        static Material ForestRock()
+        {
+            var m = LoadOrCreate($"{Dir}/Granite.mat", "Offroad/ForestRock");
+            m.SetTexture("_BaseMap", Tex("Granite_albedo"));
+            m.SetTexture("_BumpMap", Tex("Granite_normal"));
+            m.SetTexture("_TopMap", Tex("ForestFloor_albedo"));
+            m.SetTexture("_TopNormal", Tex("ForestFloor_normal"));
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetColor("_BaseColor", Color.white);
+            m.SetColor("_TopColor", new Color(0.92f, 1.0f, 0.85f));
+            m.SetFloat("_Scale", 6f);
+            m.SetFloat("_TopScale", 4f);
+            m.SetFloat("_TopAmount", 0.42f);
+            m.SetFloat("_TopSharpness", 4f);
+            m.SetFloat("_SkirtHeight", 0.8f);
+            m.SetFloat("_Smoothness", 0.12f);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>Forest ground: forest floor / meadow / soil / gravel from the region mask, granite on slopes.</summary>
+        public static Material ForestTerrain(Texture2D mask)
+        {
+            var m = LoadOrCreate($"{Dir}/ForestTerrain.mat", "Offroad/ForestTerrain");
+            m.SetTexture("_Mask", mask);
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetTexture("_FloorTex", Tex("ForestFloor_albedo"));
+            m.SetTexture("_FloorNrm", Tex("ForestFloor_normal"));
+            m.SetTexture("_MeadowTex", Tex("Meadow_albedo"));
+            m.SetTexture("_MeadowNrm", Tex("Meadow_normal"));
+            m.SetTexture("_SoilTex", Tex("ForestSoil_albedo"));
+            m.SetTexture("_SoilNrm", Tex("ForestSoil_normal"));
+            m.SetTexture("_GravelTex", Tex("RiverGravel_albedo"));
+            m.SetTexture("_GravelNrm", Tex("RiverGravel_normal"));
+            m.SetTexture("_WetMudTex", Tex("ForestMud_albedo"));
+            m.SetTexture("_RockTex", Tex("Granite_albedo"));
+            m.SetTexture("_RockNrm", Tex("Granite_normal"));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>Forest variant of the dirt track: dark soil with litter on the crown and edges.</summary>
+        public static Material DirtTrackForest()
+        {
+            var m = LoadOrCreate($"{Dir}/DirtTrackForest.mat", "Offroad/DirtTrack");
+            m.SetTexture("_DirtTex", Tex("ForestSoil_albedo"));
+            m.SetTexture("_DirtNrm", Tex("ForestSoil_normal"));
+            m.SetTexture("_SandTex", Tex("ForestFloor_albedo"));
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetFloat("_DirtScale", 3f);
+            m.SetFloat("_SandScale", 4f);
+            m.renderQueue = 1950;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        public static Material Water()
+        {
+            var m = LoadOrCreate($"{Dir}/Water.mat", "Offroad/Water");
+            m.SetTexture("_NormalTex", Tex("Water_normal"));
+            m.SetTexture("_FoamTex", Tex("Foam_albedo"));
+            m.renderQueue = 2990;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        public static Material Backdrop(string name, Color lit, Color shadow, Color haze, float hazeAmount, float hazeHeight, float snowLine = 0f)
         {
             var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Backdrop");
+            m.SetFloat("_SnowLine", snowLine);
             m.SetColor("_LitColor", lit);
             m.SetColor("_ShadowColor", shadow);
             m.SetColor("_HazeColor", haze);
@@ -158,11 +240,11 @@ namespace Offroad.EditorTools
             return m;
         }
 
-        static Material Foliage(string name, string texture, float wind, float windHeight)
+        static Material Foliage(string name, string texture, float wind, float windHeight, Color? tint = null)
         {
             var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Foliage");
             m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/Textures/Foliage/{texture}.png"));
-            m.SetColor("_BaseColor", Color.white);
+            m.SetColor("_BaseColor", tint ?? Color.white);
             m.SetFloat("_Cutoff", 0.45f);
             m.SetFloat("_WindStrength", wind);
             m.SetFloat("_WindHeight", windHeight);
@@ -233,16 +315,18 @@ namespace Offroad.EditorTools
             return m;
         }
 
-        public static Material Skybox()
+        public static Material Skybox() => Skybox("Skybox_GoldenHour", new Color(0.40f, 0.50f, 0.70f), 0.85f, 1.25f, new Color(0.62f, 0.50f, 0.44f));
+
+        public static Material Skybox(string name, Color tint, float thickness, float exposure, Color ground)
         {
-            var m = LoadOrCreate($"{Dir}/Skybox_GoldenHour.mat", "Skybox/Procedural");
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Skybox/Procedural");
             m.SetFloat("_SunDisk", 2f);               // high quality
             m.SetFloat("_SunSize", 0.035f);
             m.SetFloat("_SunSizeConvergence", 6f);
-            m.SetFloat("_AtmosphereThickness", 0.85f);   // deeper blue overhead
-            m.SetColor("_SkyTint", new Color(0.40f, 0.50f, 0.70f));
-            m.SetColor("_GroundColor", new Color(0.62f, 0.50f, 0.44f));
-            m.SetFloat("_Exposure", 1.25f);
+            m.SetFloat("_AtmosphereThickness", thickness);
+            m.SetColor("_SkyTint", tint);
+            m.SetColor("_GroundColor", ground);
+            m.SetFloat("_Exposure", exposure);
             EditorUtility.SetDirty(m);
             return m;
         }

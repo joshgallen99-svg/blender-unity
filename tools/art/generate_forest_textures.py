@@ -232,3 +232,27 @@ fir_branch("FirBranch.png", 101)
 fern("Fern.png", 102)
 meadow_grass("MeadowGrass.png", 103)
 meadow_grass("Wildflowers.png", 104, flowers=True)
+
+
+# ---------------------------------------------------------------- water (512, tileable)
+def tile_noise(size, beta, seed):
+    r = np.random.default_rng(seed)
+    f = np.fft.fftfreq(size)
+    k = np.hypot(f[None, :], f[:, None])
+    k[0, 0] = 1
+    spec = np.fft.fft2(r.standard_normal((size, size))) / k ** (beta / 2)
+    spec[0, 0] = 0
+    n = np.real(np.fft.ifft2(spec))
+    return (n - n.min()) / (n.max() - n.min())
+
+
+W = 512
+wave = tile_noise(W, 3.2, 201) * 0.7 + tile_noise(W, 2.2, 202) * 0.3      # soft swell + small chop
+wn = normal_from_height(wave, 9.0)
+Image.fromarray(((wn * 0.5 + 0.5) * 255).round().astype(np.uint8), "RGB").save(os.path.join(TERRAIN, "Water_normal.png"))
+foam = tile_noise(W, 1.6, 203)
+streak = tile_noise(W, 2.8, 204)
+foam = np.clip((foam - 0.45) * 3.5, 0, 1) * np.clip((streak - 0.3) * 2.5, 0, 1)
+foam = ndimage.gaussian_filter(foam, 0.8, mode="wrap")
+Image.fromarray((np.clip(foam, 0, 1) * 255).astype(np.uint8), "L").convert("RGB").save(os.path.join(TERRAIN, "Foam_albedo.png"))
+print("wrote Water_normal, Foam")

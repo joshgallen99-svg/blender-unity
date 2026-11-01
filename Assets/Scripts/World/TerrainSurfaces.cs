@@ -16,20 +16,22 @@ namespace Offroad.World
             public Color dustColor;
             [Tooltip("How far a tyre settles into this ground (m).")]
             public float sink;
+            [Tooltip("Which tyre rating applies here: 0 sand, 1 gravel, 2 soil/dirt, 3 rock.")]
+            public int tyreClass;
 
-            public LayerSurface(string name, float grip, float traction, float drag, float dust, Color dustColor, float sink = 0f)
+            public LayerSurface(string name, float grip, float traction, float drag, float dust, Color dustColor, float sink = 0f, int tyreClass = -1)
             {
                 this.name = name; this.grip = grip; this.traction = traction; this.drag = drag;
-                this.dust = dust; this.dustColor = dustColor; this.sink = sink;
+                this.dust = dust; this.dustColor = dustColor; this.sink = sink; this.tyreClass = tyreClass;
             }
         }
 
         public LayerSurface[] layers =
         {
-            new LayerSurface("Sand", 0.84f, 0.8f, 0.55f, 1.0f, new Color(0.86f, 0.62f, 0.42f), 0.035f),
-            new LayerSurface("Gravel", 0.93f, 0.95f, 0.08f, 0.7f, new Color(0.64f, 0.54f, 0.45f), 0.008f),
-            new LayerSurface("CrackedSoil", 1.0f, 1.0f, 0.03f, 0.85f, new Color(0.80f, 0.66f, 0.52f), 0.012f),
-            new LayerSurface("RedRock", 1.12f, 1.0f, 0.0f, 0.25f, new Color(0.62f, 0.38f, 0.27f), 0f),
+            new LayerSurface("Sand", 0.84f, 0.8f, 0.55f, 1.0f, new Color(0.86f, 0.62f, 0.42f), 0.035f, 0),
+            new LayerSurface("Gravel", 0.93f, 0.95f, 0.08f, 0.7f, new Color(0.64f, 0.54f, 0.45f), 0.008f, 1),
+            new LayerSurface("CrackedSoil", 1.0f, 1.0f, 0.03f, 0.85f, new Color(0.80f, 0.66f, 0.52f), 0.012f, 2),
+            new LayerSurface("RedRock", 1.12f, 1.0f, 0.0f, 0.25f, new Color(0.62f, 0.38f, 0.27f), 0f, 3),
         };
         public LayerSurface objects = new LayerSurface("Rock", 1.1f, 1.0f, 0f, 0.15f, new Color(0.6f, 0.4f, 0.3f));
 
@@ -38,6 +40,18 @@ namespace Offroad.World
         public Texture2D hazardMap;
         public LayerSurface mud = new LayerSurface("Mud", 0.62f, 0.62f, 0.75f, 1.0f, new Color(0.30f, 0.21f, 0.15f));
         public LayerSurface quicksand = new LayerSurface("Quicksand", 0.55f, 0.4f, 1.2f, 0.6f, new Color(0.62f, 0.5f, 0.38f));
+        [Tooltip("Hazard map green = water depth / 2.5 m (rivers) instead of quicksand.")]
+        public bool greenIsWater;
+        public Color splashColor = new Color(0.85f, 0.9f, 0.95f);
+
+        /// <summary>Default physics layers for the forest valley (forest floor, meadow, soil, rock).</summary>
+        public static LayerSurface[] ForestLayers() => new[]
+        {
+            new LayerSurface("ForestFloor", 0.95f, 0.92f, 0.12f, 0.35f, new Color(0.33f, 0.30f, 0.22f), 0.03f, 2),
+            new LayerSurface("Meadow", 0.9f, 0.9f, 0.1f, 0.25f, new Color(0.45f, 0.42f, 0.30f), 0.025f, 2),
+            new LayerSurface("Soil", 0.93f, 0.9f, 0.08f, 0.6f, new Color(0.36f, 0.26f, 0.18f), 0.035f, 2),
+            new LayerSurface("Granite", 1.1f, 1.0f, 0.0f, 0.12f, new Color(0.55f, 0.55f, 0.53f), 0f, 3),
+        };
 
         Terrain _terrain;
         TerrainCollider _collider;
@@ -78,7 +92,8 @@ namespace Offroad.World
                 s.dust += l.dust * wgt;
                 s.dustColor += l.dustColor * wgt;
                 s.sink += l.sink * wgt;
-                s.layers[i] = wgt;
+                int cls = l.tyreClass >= 0 && l.tyreClass < 4 ? l.tyreClass : i;
+                s.layers[cls] += wgt;
                 total += wgt;
             }
             if (total <= 1e-4f) return SurfaceInfo.Default;
@@ -97,11 +112,20 @@ namespace Offroad.World
         {
             var hz = hazardMap.GetPixelBilinear(u, v);
             float mudW = Mathf.Clamp01(Mathf.Max(hz.r, hz.a));
-            float quick = Mathf.Clamp01(hz.g);
+            float quick = greenIsWater ? 0f : Mathf.Clamp01(hz.g);
             if (mudW > 0.02f) Blend(ref s, mud, mudW);
             if (quick > 0.02f) Blend(ref s, quicksand, quick);
             s.mud = mudW;
             s.quicksand = quick;
+            if (greenIsWater && hz.g > 0.004f)
+            {
+                s.water = hz.g * 2.5f;
+                float wet = Mathf.Clamp01(s.water * 4f);
+                s.dust = Mathf.Max(s.dust, wet);
+                s.dustColor = Color.Lerp(s.dustColor, splashColor, wet);
+                s.grip *= Mathf.Lerp(1f, 0.85f, wet);
+                s.sink = 0f;
+            }
             s.washboard = Mathf.Clamp01(hz.b);
         }
 

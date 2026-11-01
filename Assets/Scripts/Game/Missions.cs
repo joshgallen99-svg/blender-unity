@@ -16,6 +16,20 @@ namespace Offroad.Game
         public bool returnToCamp;
         public int reward;
         public bool freeRoam;
+        public string region = Regions.Desert;
+        public string camp = "basecamp";   // landmark id of the region's camp
+    }
+
+    /// <summary>The regions you can drive, each its own scene.</summary>
+    public static class Regions
+    {
+        public const string Desert = "desert";
+        public const string Forest = "forest";
+
+        public static string Title(string id) => id == Forest ? "Cedar Hollow" : "Fire Canyon";
+        public static string Subtitle(string id) => id == Forest ? "Forest river valley" : "Desert canyon country";
+        public static string Scene(string id) => id == Forest ? "Forest" : "Prototype";
+        public static readonly string[] Order = { Desert, Forest };
     }
 
     public static class Missions
@@ -64,8 +78,46 @@ namespace Offroad.Game
                 tip = "Every new landmark is worth 150 scrap.",
                 targets = Array.Empty<string>(),
             },
+
+            // ---- Cedar Hollow (forest river valley)
+            new MissionDef
+            {
+                id = "falls", title = "Twin Falls", reward = 300, region = Regions.Forest, camp = "trailhead",
+                brief = "Follow the old logging track up the valley, over the Old Bridge, to the falls at its head.",
+                tip = "Two fords on the way. Under a metre of water is fine; take it slow and keep the revs up.",
+                targets = new[] { "old_bridge", "twin_falls" },
+            },
+            new MissionDef
+            {
+                id = "lookout", title = "Fire Watch", reward = 350, returnToCamp = true, region = Regions.Forest, camp = "trailhead",
+                brief = "Climb the switchbacks to the fire lookout on the eastern ridge, then get back to the trailhead.",
+                tip = "Steep packed soil. Gripjaw M/T tyres climb best; watch the hairpins.",
+                targets = new[] { "lookout" },
+            },
+            new MissionDef
+            {
+                id = "mudrun", title = "Mud Season", reward = 400, region = Regions.Forest, camp = "trailhead",
+                brief = "The track to the Beaver Pond is a string of mud holes. Get there without needing a tow.",
+                tip = "Mud tyres or bust: Dunerunners skate in the mud. Hit the holes with some momentum.",
+                targets = new[] { "beaver_pond" },
+            },
+            new MissionDef
+            {
+                id = "logging", title = "The Old Logging Road", reward = 300, region = Regions.Forest, camp = "trailhead",
+                brief = "Check on the abandoned logging camp in the south-west, then call in at the Ranger's Cabin.",
+                tip = "Soft forest soil takes deep ruts: follow the wheel tracks where you can.",
+                targets = new[] { "logging_camp", "ranger_cabin" },
+            },
+            new MissionDef
+            {
+                id = "roam_forest", title = "Free Roam", reward = 0, freeRoam = true, region = Regions.Forest, camp = "trailhead",
+                brief = "No objectives. Explore Cedar Hollow: the river, the domes and the deep woods.",
+                tip = "Every new landmark is worth 150 scrap.",
+                targets = Array.Empty<string>(),
+            },
         };
 
         public static MissionDef Find(string id) => Array.Find(All, m => m.id == id);
+        public static MissionDef FreeRoam(string region) => Array.Find(All, m => m.freeRoam && m.region == region) ?? Find("roam");
     }
 }

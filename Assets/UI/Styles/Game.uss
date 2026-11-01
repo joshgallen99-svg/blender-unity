@@ -186,3 +186,8 @@
 
 .hazard-warning { position: absolute; left: 0; right: 0; top: 150px; -unity-text-align: middle-center; font-size: 22px;
     -unity-font-style: bold; letter-spacing: 2px; color: rgb(255, 214, 160); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8); }
+
+.region-header { margin-top: 14px; margin-bottom: 6px; flex-direction: row; align-items: flex-end; }
+.region-header .muted { margin-left: 12px; margin-bottom: 3px; color: var(--muted); }
+.loading { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgb(12, 12, 13);
+    align-items: center; justify-content: center; }

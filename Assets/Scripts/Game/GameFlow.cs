@@ -18,6 +18,11 @@ namespace Offroad.Game
         public ChaseCamera cam;
         public MissionRunner runner;
         public UIRoot ui;
+        [Tooltip("Which region this scene is (see Regions).")]
+        public string regionId = Regions.Desert;
+
+        /// <summary>Mission to start as soon as the next region's scene has loaded.</summary>
+        static string _pendingMission;
 
         public FlowState State { get; private set; } = FlowState.Title;
         public static GameFlow Instance { get; private set; }
@@ -40,7 +45,10 @@ namespace Offroad.Game
             ApplyLoadout();
             Loadout.Changed += OnLoadoutChanged;
             if (runner) runner.Completed += OnMissionCompleted;
-            GoTitle();
+            var pending = _pendingMission != null ? Missions.Find(_pendingMission) : null;
+            _pendingMission = null;
+            if (pending != null && pending.region == regionId) StartMission(pending);
+            else GoTitle();
         }
 
         void OnDestroy()
@@ -95,6 +103,15 @@ namespace Offroad.Game
 
         public void StartMission(MissionDef m)
         {
+            if (m.region != regionId)
+            {
+                // Another region: load its scene, then start the mission there.
+                _pendingMission = m.id;
+                Time.timeScale = 1f;
+                ui?.ShowLoading(Regions.Title(m.region));
+                UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(Regions.Scene(m.region));
+                return;
+            }
             ApplyLoadout();
             ResetVehicle();
             State = FlowState.Driving;
@@ -109,7 +126,7 @@ namespace Offroad.Game
         public void ContinueExploring()
         {
             State = FlowState.Driving;
-            runner?.Begin(Missions.Find("roam"));
+            runner?.Begin(Missions.FreeRoam(regionId));
             ui?.ShowHud(runner?.Active);
             SetCursor(true);
         }
@@ -171,9 +188,21 @@ namespace Offroad.Game
             Vector3 from = (vehicle.transform.position - c);
             from.y = 0f;
             if (from.sqrMagnitude < 1f) from = Vector3.back;
-            Vector3 p = c + from.normalized * Mathf.Max(28f, l.discoverRadius * 0.9f) + Vector3.up * 40f;
-            if (Physics.Raycast(p, Vector3.down, out var hit, 200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-                p = hit.point + Vector3.up * 1.2f;
+            // Try spots around the landmark until one lands on open, fairly flat ground (not on a rock).
+            Vector3 dir = from.normalized;
+            float dist = Mathf.Max(28f, l.discoverRadius * 0.9f);
+            Vector3 p = c + dir * dist + Vector3.up * 1.2f;
+            for (int k = 0; k < 16; k++)
+            {
+                Vector3 q = c + Quaternion.Euler(0f, k * 23f, 0f) * dir * (dist + (k / 4) * 6f) + Vector3.up * 60f;
+                if (!Physics.Raycast(q, Vector3.down, out var hit, 250f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                    continue;
+                bool ground = hit.collider is TerrainCollider && hit.normal.y > 0.85f;
+                bool clear = !Physics.CheckBox(hit.point + Vector3.up * 1.4f, new Vector3(1.6f, 1.0f, 2.8f),
+                    Quaternion.identity, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                if (ground && clear) { p = hit.point + Vector3.up * 1.2f; break; }
+                if (k == 0) p = hit.point + Vector3.up * 1.2f;
+            }
             Vector3 look = c - p;
             look.y = 0f;
             vehicle.Teleport(p, Quaternion.LookRotation(look.normalized, Vector3.up));

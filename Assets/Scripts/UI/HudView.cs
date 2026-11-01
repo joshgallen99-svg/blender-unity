@@ -26,7 +26,7 @@ namespace Offroad.UI
 
         // Text is rebuilt at ~8 Hz (and only when it changes) so the HUD makes no garbage per frame.
         const float TextInterval = 0.125f;
-        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "PACKED DIRT", "ROCK", "MUD", "QUICKSAND", "WASHBOARD" };
+        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "DIRT", "ROCK", "MUD", "QUICKSAND", "WASHBOARD", "WATER" };
         static readonly string[] Numbers = BuildNumbers(400);
         readonly List<(float d, Landmark l)> _nearby = new List<(float, Landmark)>();
         readonly Vector3[] _markerTarget = new Vector3[8];
@@ -182,7 +182,8 @@ namespace Offroad.UI
                 int best = 0;
                 for (int i = 1; i < 4; i++) if (layers[i] > layers[best]) best = i;
                 float inv = 1f / grounded;
-                if (quick * inv > 0.3f) best = 5;
+                if (v.WaterDepth > 0.08f) best = 7;
+                else if (quick * inv > 0.3f) best = 5;
                 else if (mud * inv > 0.4f) best = 4;
                 else if (wash * inv > 0.3f) best = 6;
                 var tireId = _asm ? _asm.ActiveTire : "at";
@@ -235,6 +236,11 @@ namespace Offroad.UI
             if (sinking)
             {
                 SetText(_warning, v.QuicksandSink > 0.3f ? "STUCK IN QUICKSAND  ·  press R to winch out" : "QUICKSAND  ·  keep moving!");
+                _warning.AddToClassList("shown");
+            }
+            else if (v.WaterDepth > v.fordingDepth * 0.7f)
+            {
+                SetText(_warning, v.Flooded ? "TOO DEEP  ·  engine flooding, back out or press R" : "DEEP WATER  ·  ease off");
                 _warning.AddToClassList("shown");
             }
             else _warning.RemoveFromClassList("shown");

@@ -104,6 +104,8 @@ namespace Offroad.Vehicles
         [Tooltip("Height of washboard corrugations (m) and their spacing (m).")]
         public float washboardHeight = 0.014f;
         public float washboardSpacing = 0.75f;
+        [Tooltip("Water deeper than this (m) floods the air intake: the engine barely pulls.")]
+        public float fordingDepth = 0.85f;
 
         [Header("Stability")]
         public Vector3 centerOfMass = new Vector3(0f, 0.58f, 0.05f);
@@ -124,6 +126,9 @@ namespace Offroad.Vehicles
         public float QuicksandSink { get; private set; }
         /// <summary>0..1 how hard the vehicle is being shaken by washboard right now.</summary>
         public float Rattle { get; private set; }
+        /// <summary>Deepest water under any wheel (m).</summary>
+        public float WaterDepth { get; private set; }
+        public bool Flooded => WaterDepth > fordingDepth;
 
         const float CastLift = 0.3f;              // start casts above the travel so close ground is not missed
         static readonly RaycastHit[] Hits = new RaycastHit[16];
@@ -229,6 +234,7 @@ namespace Offroad.Vehicles
             }
             else _brakeHeldAtStop = 0f;
             bool idle = controls.throttle <= 0.01f && controls.brake <= 0.01f;
+            if (Flooded) driveTotal *= 0.2f;                 // water in the intake: barely any power
 
             // ---- Tyre forces.
             int drivenGrounded = 0;
@@ -266,7 +272,8 @@ namespace Offroad.Vehicles
                     fLong += stopForce;                        // hold on slopes when no pedal is pressed
                 }
                 fLong -= vLong * (rollingResistance * tire.rolling + w.surface.drag * 220f * tire.DragOn(w.surface)
-                                  + w.sink * 1800f);                       // ploughing through soft ground
+                                  + w.sink * 1800f                         // ploughing through soft ground
+                                  + Mathf.Min(w.surface.water, 1.2f) * 700f);   // wading
                 if (w.surface.washboard > 0.01f)
                     grip *= 1f - 0.22f * w.surface.washboard * Mathf.Clamp01(Mathf.Abs(vLong) / 12f);
 
@@ -302,20 +309,28 @@ namespace Offroad.Vehicles
 
         void TrackSoftGround(float dt)
         {
-            float deepest = 0f, rattle = 0f, hazard = 0f;
+            float deepest = 0f, rattle = 0f, hazard = 0f, water = 0f;
             foreach (var w in wheels)
             {
                 deepest = Mathf.Max(deepest, w.quickSink);
                 if (!w.grounded) continue;
+                water = Mathf.Max(water, w.surface.water);
                 rattle = Mathf.Max(rattle, w.surface.washboard * Mathf.Clamp01(Mathf.Abs(ForwardSpeed) / 10f));
                 hazard = Mathf.Max(hazard, w.surface.quicksand + w.surface.mud * 0.5f);
             }
             QuicksandSink = deepest;
             Rattle = rattle;
+            WaterDepth = water;
+            // The body pushing through water: drag on the whole vehicle, growing with depth.
+            if (water > 0.25f)
+            {
+                Vector3 v = Body.linearVelocity;
+                Body.AddForce(-v * v.magnitude * Mathf.Min(water, 1.5f) * 140f);
+            }
 
             // Remember the last spot on firm ground, for recovery.
             _safeTimer += dt;
-            if (_safeTimer > 1f && GroundedWheels >= 3 && hazard < 0.05f && deepest < 0.01f &&
+            if (_safeTimer > 1f && GroundedWheels >= 3 && hazard < 0.05f && deepest < 0.01f && water < 0.05f &&
                 Vector3.Dot(transform.up, Vector3.up) > 0.85f)
             {
                 _safeTimer = 0f;
@@ -443,6 +458,7 @@ namespace Offroad.Vehicles
         {
             bool stuck = QuicksandSink > 0.2f;
             foreach (var w in wheels) stuck |= w.sink > 0.2f;
+            stuck |= Flooded;
             if (stuck && _hasSafe)
             {
                 Teleport(_safePosition + Vector3.up * 0.6f, _safeRotation);

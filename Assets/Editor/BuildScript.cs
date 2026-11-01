@@ -10,9 +10,10 @@ public static class BuildScript
     public static void BuildWebGL()
     {
         PrepareProject();
-        // Uncompressed output so any plain static file server can host it for playtesting.
-        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
-        PlayerSettings.WebGL.decompressionFallback = false;
+        // Gzip with the loader's built-in decompression: small files (two regions now) that any plain
+        // static file server can still host for playtesting, no special headers needed.
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+        PlayerSettings.WebGL.decompressionFallback = true;
         PlayerSettings.WebGL.dataCaching = false;
         Build(BuildTarget.WebGL, System.Environment.GetEnvironmentVariable("BUILD_PATH") ?? "build/WebGL/WebGL");
     }

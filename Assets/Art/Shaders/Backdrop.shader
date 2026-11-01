@@ -9,6 +9,7 @@ Shader "Offroad/Backdrop"
         _HazeColor ("Haze Colour", Color) = (0.72, 0.78, 0.86, 1)
         _Haze ("Haze Amount", Range(0, 1)) = 0.55
         _HazeHeight ("Haze Fades By Height (m)", Float) = 300
+        _SnowLine ("Snow Line (m, 0 = none)", Float) = 0
     }
 
     SubShader
@@ -31,6 +32,7 @@ Shader "Offroad/Backdrop"
                 half4 _LitColor, _ShadowColor, _HazeColor;
                 half _Haze;
                 float _HazeHeight;
+                float _SnowLine;
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float4 color : COLOR; };
@@ -64,6 +66,9 @@ Shader "Offroad/Backdrop"
                 half3 n = normalize(i.normalWS);
                 half ndl = saturate(dot(n, sun.direction) * 0.8 + 0.2);
                 half3 col = lerp(_ShadowColor.rgb, _LitColor.rgb, ndl) * i.color.rgb;
+                // Snow on the high, gentler slopes.
+                half snow = _SnowLine > 0 ? smoothstep(_SnowLine - 30.0, _SnowLine + 30.0, i.height + (n.y - 0.6) * 80.0) : 0;
+                col = lerp(col, lerp(half3(0.50, 0.58, 0.72), half3(0.94, 0.95, 0.98), ndl), snow);
                 // Thicker haze near the base of the ranges, clearer toward the peaks.
                 half haze = saturate(_Haze * (1.15 - saturate(i.height / _HazeHeight) * 0.5));
                 return half4(lerp(col, _HazeColor.rgb, haze), 1);

@@ -161,4 +161,29 @@ public class GeneratedAssetTests
         Assert.Greater(scatter.props.Length, 1000);
         Assert.That(info.spawn.x, Is.InRange(50f, info.size - 50f));
     }
+
+    [Test]
+    public void ForestRegionDataAndModelsExist()
+    {
+        var info = JsonUtility.FromJson<PrototypeSceneBuilder.RegionInfo>(File.ReadAllText("Assets/Terrain/Source~/forest_info.json"));
+        Assert.AreEqual(info.resolution * info.resolution * 2, new FileInfo("Assets/Terrain/Source~/forest_height.r16").Length);
+        Assert.GreaterOrEqual(info.tracks.Length, 5, "main track plus side tracks");
+        Assert.Greater(info.river.x.Length, 100, "river path");
+        Assert.Greater(info.lake.rx, 10f, "plunge lake");
+        Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Masks/forest_mask.png"));
+        Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Masks/forest_hazard.png"));
+        var props = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Props/ForestProps.fbx");
+        Assert.IsNotNull(props);
+        foreach (var n in new[] { "Fir_0", "Fir_0_LOD1", "Fir_0_LOD2", "Fir_2_LOD2", "Aspen_1_LOD1", "Log_0", "GBoulder_3_LOD1", "Fern_0", "MeadowGrass_1" })
+            Assert.IsNotNull(props.transform.Find(n), n);
+        var granite = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Formations/GraniteFormations.fbx");
+        foreach (var f in info.formations)
+            Assert.IsNotNull(granite.transform.Find(f.model + "_LOD1"), f.model);
+        var landmarks = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Landmarks/ForestLandmarks.fbx");
+        foreach (var n in new[] { "LogCabin", "FireLookout", "WoodBridge", "LogPile", "WoodPile" })
+            Assert.IsNotNull(landmarks.transform.Find(n), n);
+        // A fir should stand upright (Unity Y) and be much taller than wide.
+        var fir = props.transform.Find("Fir_1").GetComponent<MeshFilter>().sharedMesh.bounds;
+        Assert.Greater(fir.size.y, fir.size.x * 1.5f);
+    }
 }
