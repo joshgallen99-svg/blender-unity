@@ -37,7 +37,10 @@ cost so a fanless MacBook Air holds 60 FPS on Medium.
    is pale, smooth and slowly breathing, ringed by damp sand and marked by a warning sign. Both come
    from one hazard map (`desert_hazard.png`: R mud, G quicksand, B washboard, A water) that the
    shaders and the vehicle physics read.
-10. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
+10. **A living sky.** Procedural cumulus (Clouds.shader) drift over both regions, lit from the sun
+    side with a silver lining near it and fading into the horizon haze; sparse over the canyon, fuller
+    over the valley.
+11. **Layers of distance.** Near rocks → valley → border cliffs → red mesas (1.4 km) → blue mountain
    ranges (2.6–3.4 km), with bluer haze the further you go.
 
 ## Palette (linear)
