@@ -97,6 +97,12 @@ namespace Offroad.EditorTools
             a.useSRPBatcher = true;
             a.supportsCameraDepthTexture = false;
             a.supportsCameraOpaqueTexture = false;
+            // Sun only: no additional lights means fewer shader variants and cheaper lighting.
+            var so = new SerializedObject(a);
+            var addl = so.FindProperty("m_AdditionalLightsRenderingMode");
+            if (addl != null) { addl.intValue = (int)LightRenderingMode.Disabled; so.ApplyModifiedPropertiesWithoutUndo(); }
+            a.upscalingFilter = UpscalingFilterSelection.FSR;
+            a.colorGradingMode = ColorGradingMode.LowDynamicRange;
             EditorUtility.SetDirty(a);
         }
     }

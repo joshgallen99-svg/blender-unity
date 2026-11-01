@@ -195,6 +195,7 @@ namespace Offroad.Game
         void Update()
         {
             GameInput.Poll();
+            GameSettings.CheckResolution();
             if (GameInput.MenuPressed)
             {
                 switch (State)

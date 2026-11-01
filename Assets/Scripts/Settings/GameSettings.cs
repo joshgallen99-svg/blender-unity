@@ -38,6 +38,34 @@ namespace Offroad.Settings
         public static event Action<SettingsData> Changed;
 
         static UniversalRenderPipelineAsset _runtimeAsset;
+        static int _lastScreenHeight;
+
+        /// <summary>Internal render height cap per preset (before the user's render-scale slider).</summary>
+        public static int MaxRenderHeight(QualityPreset p) => p switch
+        {
+            QualityPreset.BatterySaver => 720,
+            QualityPreset.Low => 900,
+            QualityPreset.High => 1440,
+            _ => 1080,
+        };
+
+        public static float EffectiveRenderScale(SettingsData s)
+        {
+            int h = Mathf.Max(Screen.height, 1);
+            var capPreset = s.preset == QualityPreset.Custom ? QualityPreset.Medium : s.preset;
+            float cap = Mathf.Min(1f, MaxRenderHeight(capPreset) / (float)h);
+            return Mathf.Clamp(s.renderScale * cap, 0.35f, 1f);
+        }
+
+        /// <summary>Re-apply the render scale when the window or display resolution changes.</summary>
+        public static void CheckResolution()
+        {
+            if (_runtimeAsset != null && Screen.height != _lastScreenHeight)
+            {
+                _lastScreenHeight = Screen.height;
+                _runtimeAsset.renderScale = EffectiveRenderScale(Current);
+            }
+        }
 
         public static SettingsData Preset(QualityPreset p)
         {
@@ -119,10 +147,17 @@ namespace Offroad.Settings
             }
             if (_runtimeAsset != null)
             {
-                _runtimeAsset.renderScale = s.renderScale;
+                // Retina screens have ~2.5x the pixels of 1080p. Render at most ~MaxRenderHeight lines
+                // and let FSR upscale and sharpen: almost the same picture for a fraction of the GPU work.
+                _runtimeAsset.renderScale = EffectiveRenderScale(s);
+                _runtimeAsset.upscalingFilter = UpscalingFilterSelection.FSR;
+                _runtimeAsset.fsrOverrideSharpness = true;
+                _runtimeAsset.fsrSharpness = 0.82f;
+                _lastScreenHeight = Screen.height;
                 _runtimeAsset.shadowDistance = s.shadows == ShadowSetting.Off ? 0f
                     : s.shadows == ShadowSetting.Low ? 70f : 160f;
                 _runtimeAsset.shadowCascadeCount = s.shadows == ShadowSetting.High ? 4 : 2;
+                _runtimeAsset.mainLightShadowmapResolution = s.shadows == ShadowSetting.High ? 2048 : 1024;
                 _runtimeAsset.msaaSampleCount = 1;
             }
 

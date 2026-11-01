@@ -32,14 +32,16 @@ namespace Offroad.EditorTools
         const string LandmarksModel = "Assets/Models/Landmarks/DesertLandmarks.fbx";
         const string FormationsModel = "Assets/Models/Formations/Formations.fbx";
 
-        // Small scenery drawn with GPU instancing (no GameObjects, no colliders): name -> draw distance, shadows.
-        static readonly Dictionary<string, (float distance, bool shadows, float align)> Instanced =
-            new Dictionary<string, (float, bool, float)>
+        // Scenery drawn with GPU instancing: name -> draw distance, shadows, ground alignment, LOD1
+        // distance (0 = no LOD), and whether each piece also gets a collider-only GameObject.
+        static readonly Dictionary<string, (float distance, bool shadows, float align, float lod, bool collider)> Instanced =
+            new Dictionary<string, (float, bool, float, float, bool)>
             {
-                ["Grass"] = (110f, false, 0.6f),
-                ["Scrub"] = (220f, true, 0.3f),
-                ["Rock"] = (180f, true, 0.8f),
-                ["Yucca"] = (200f, true, 0.1f),
+                ["Grass"] = (110f, false, 0.6f, 0f, false),
+                ["Scrub"] = (220f, true, 0.3f, 0f, false),
+                ["Rock"] = (180f, true, 0.8f, 0f, false),
+                ["Yucca"] = (200f, true, 0.1f, 0f, false),
+                ["Boulder"] = (330f, true, 0.6f, 70f, true),
             };
 
         [Serializable] public class SpawnInfo { public float x, z, yaw; }
@@ -289,6 +291,26 @@ namespace Offroad.EditorTools
                     var up = Vector3.Slerp(Vector3.up, n, spec.align).normalized;
                     if (!data.TryGetValue(key, out var list)) data[key] = list = new List<float>();
                     list.AddRange(new[] { pos.x, pos.y, pos.z, p.yaw, p.scale, up.x, up.z });
+                    if (spec.collider)
+                    {
+                        // Collider only: the mesh itself is drawn by the instancer.
+                        var src = model.transform.Find(key + "_LOD1");
+                        if (src == null) src = model.transform.Find(key);
+                        if (src == null) continue;
+                        if (!groups.TryGetValue(p.kind, out var cgroup))
+                        {
+                            cgroup = new GameObject(p.kind + " Colliders").transform;
+                            cgroup.SetParent(root, false);
+                            groups[p.kind] = cgroup;
+                        }
+                        var col = new GameObject(key);
+                        col.transform.SetParent(cgroup, false);
+                        col.transform.SetPositionAndRotation(pos, Quaternion.FromToRotation(Vector3.up, up) * Quaternion.Euler(0f, p.yaw, 0f));
+                        col.transform.localScale = Vector3.one * p.scale;
+                        col.AddComponent<MeshCollider>().sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+                        col.isStatic = true;
+                        gameObjects++;
+                    }
                     continue;
                 }
 
@@ -317,10 +339,13 @@ namespace Offroad.EditorTools
                 var src = model.transform.Find(kv.Key);
                 if (src == null) { Debug.LogWarning($"[Offroad] Prop mesh {kv.Key} not found"); continue; }
                 var spec = Instanced[kv.Key.Split('_')[0]];
+                var lodSrc = spec.lod > 0f ? model.transform.Find(kv.Key + "_LOD1") : null;
                 inst.prototypes.Add(new InstancePrototype
                 {
                     name = kv.Key,
                     mesh = src.GetComponent<MeshFilter>().sharedMesh,
+                    lodMesh = lodSrc != null ? lodSrc.GetComponent<MeshFilter>().sharedMesh : null,
+                    lodDistance = spec.lod,
                     materials = MaterialLibrary.Remap(src.GetComponent<MeshRenderer>().sharedMaterials),
                     castShadows = spec.shadows,
                     drawDistance = spec.distance,
@@ -472,7 +497,22 @@ namespace Offroad.EditorTools
                     break;
             }
             var lod = go.AddComponent<LODGroup>();
-            lod.SetLODs(new[] { new LOD(kind.cullHeight, new Renderer[] { mr }) });
+            var lowSrc = model.transform.Find(name + "_LOD1");
+            if (lowSrc != null)
+            {
+                var low = new GameObject(name + "_LOD1");
+                low.transform.SetParent(go.transform, false);
+                low.AddComponent<MeshFilter>().sharedMesh = lowSrc.GetComponent<MeshFilter>().sharedMesh;
+                var lowMr = low.AddComponent<MeshRenderer>();
+                lowMr.sharedMaterials = mr.sharedMaterials;
+                lowMr.shadowCastingMode = mr.shadowCastingMode;
+                lod.SetLODs(new[]
+                {
+                    new LOD(Mathf.Max(kind.cullHeight * 12f, 0.05f), new Renderer[] { mr }),
+                    new LOD(kind.cullHeight, new Renderer[] { lowMr }),
+                });
+            }
+            else lod.SetLODs(new[] { new LOD(kind.cullHeight, new Renderer[] { mr }) });
             lod.fadeMode = LODFadeMode.None;
 
             Directory.CreateDirectory($"{PrefabDir}/Props");

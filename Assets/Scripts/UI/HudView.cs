@@ -21,7 +21,29 @@ namespace Offroad.UI
         readonly List<float> _tickAngles = new List<float>();
         readonly List<Label> _markers = new List<Label>();
         VehicleAssembler _asm;
-        float _shownAt, _fpsTimer, _fpsSmoothed = 60f;
+        float _shownAt, _fpsTimer, _textTimer, _fpsSmoothed = 60f;
+        int _lastKmh = -1, _lastFitKey = -1;
+
+        // Text is rebuilt at ~8 Hz (and only when it changes) so the HUD makes no garbage per frame.
+        const float TextInterval = 0.125f;
+        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "PACKED DIRT", "ROCK" };
+        static readonly string[] Numbers = BuildNumbers(400);
+        readonly List<(float d, Landmark l)> _nearby = new List<(float, Landmark)>();
+        readonly Vector3[] _markerTarget = new Vector3[8];
+        readonly bool[] _markerObjective = new bool[8];
+        int _markersUsed;
+
+        static string[] BuildNumbers(int n)
+        {
+            var a = new string[n + 1];
+            for (int i = 0; i <= n; i++) a[i] = i.ToString();
+            return a;
+        }
+
+        static void SetText(Label l, string s)
+        {
+            if (l.text != s) l.text = s;
+        }
         const float CompassWidth = 760f, CompassFov = 180f;
 
         public HudView(UIRoot ui)
@@ -131,10 +153,14 @@ namespace Offroad.UI
             if (!v) return;
 
             float kmh = Mathf.Abs(v.ForwardSpeed) * 3.6f;
-            _speed.text = Mathf.RoundToInt(kmh).ToString();
+            int kmhInt = Mathf.Clamp(Mathf.RoundToInt(kmh), 0, Numbers.Length - 1);
+            if (kmhInt != _lastKmh) { _lastKmh = kmhInt; _speed.text = Numbers[kmhInt]; }
             _gauge.value = Mathf.Lerp(_gauge.value, kmh / 130f, 0.25f);
             _gauge.MarkDirtyRepaint();
-            _gear.text = v.IsReversing ? "R" : kmh < 1f ? "N" : "D";
+            SetText(_gear, v.IsReversing ? "R" : kmh < 1f ? "N" : "D");
+            _textTimer += Time.unscaledDeltaTime;
+            bool refreshText = _textTimer >= TextInterval;
+            if (refreshText) _textTimer = 0f;
 
             // Surface under the wheels and how well the fitted tyres suit it.
             Vector4 layers = Vector4.zero;
@@ -145,16 +171,21 @@ namespace Offroad.UI
                 layers += w.surface.layers;
                 grounded++;
             }
-            if (grounded > 0)
+            if (grounded > 0 && refreshText)
             {
                 int best = 0;
                 for (int i = 1; i < 4; i++) if (layers[i] > layers[best]) best = i;
-                _surface.text = new[] { "SAND", "GRAVEL", "PACKED DIRT", "ROCK" }[best];
-                var tire = Catalog.Tire(_asm ? _asm.ActiveTire : "at");
+                var tireId = _asm ? _asm.ActiveTire : "at";
                 float fit = v.tire.GripOn(new SurfaceInfo { layers = layers });
                 bool good = fit >= 1.05f, poor = fit < 0.88f;
-                _fitText.text = $"{tire.name}: {(good ? "great grip" : poor ? "poor grip" : "ok")}";
-                _fitDot.style.backgroundColor = good ? new Color(0.52f, 0.81f, 0.44f) : poor ? new Color(0.92f, 0.38f, 0.3f) : new Color(0.95f, 0.75f, 0.3f);
+                int fitKey = best * 10 + (good ? 2 : poor ? 0 : 1) + (tireId.GetHashCode() & 0xffff) * 100;
+                if (fitKey != _lastFitKey)
+                {
+                    _lastFitKey = fitKey;
+                    _surface.text = SurfaceNames[best];
+                    _fitText.text = $"{Catalog.Tire(tireId).name}: {(good ? "great grip" : poor ? "poor grip" : "ok")}";
+                    _fitDot.style.backgroundColor = good ? new Color(0.52f, 0.81f, 0.44f) : poor ? new Color(0.92f, 0.38f, 0.3f) : new Color(0.95f, 0.75f, 0.3f);
+                }
             }
 
             // Compass.
@@ -173,27 +204,41 @@ namespace Offroad.UI
                     t.style.opacity = 1f - Mathf.Abs(d) / (CompassFov * 0.5f) * 0.7f;
                 }
             }
-            UpdateMarkers(v.transform.position, yaw, pxPerDeg, runner);
+            if (refreshText) AssignMarkers(v.transform.position, runner);
+            for (int i = 0; i < _markersUsed; i++) Place(_markers[i], _markerTarget[i], v.transform.position, yaw, pxPerDeg, _markerObjective[i]);
+
+            // FPS (smoothed every frame, shown at 4 Hz) and the spare-swap progress bar (every frame).
+            float dt = Time.unscaledDeltaTime;
+            if (dt > 0f) _fpsSmoothed = Mathf.Lerp(_fpsSmoothed, 1f / dt, 0.05f);
+            _fpsTimer += dt;
+            if (_fpsTimer > 0.25f)
+            {
+                _fpsTimer = 0f;
+                SetText(_fps, GameSettings.Current.showFps ? $"{_fpsSmoothed:0} FPS  ·  {1000f / Mathf.Max(_fpsSmoothed, 1f):0.0} ms" : "");
+            }
+            if (_asm && runner && runner.Swapping) _spareFill.style.width = Length.Percent(runner.SwapProgress * 100f);
+
+            if (!refreshText) return;
 
             // Objective text and distance.
             if (runner && runner.Active != null)
             {
-                _objText.text = runner.ObjectiveText;
+                SetText(_objText, runner.ObjectiveText);
                 var target = runner.Target;
-                _objDist.text = target.HasValue ? FormatDistance(Vector3.Distance(Flat(target.Value), Flat(v.transform.position))) : "";
+                SetText(_objDist, target.HasValue ? FormatDistance(Vector3.Distance(Flat(target.Value), Flat(v.transform.position))) : "");
             }
-            _scrap.text = UIKit.Money(Progress.Scrap);
+            SetText(_scrap, UIKit.Money(Progress.Scrap));
 
             // Spare wheel.
             if (_asm)
             {
-                _spareName.text = Catalog.Tire(_asm.ActiveSpare).name.ToUpperInvariant();
+                SetText(_spareName, Catalog.Tire(_asm.ActiveSpare).name.ToUpperInvariant());
                 string state;
                 if (runner && runner.Swapping) state = "Changing wheels...";
                 else if (runner && runner.SpareUsed) state = "Used this expedition";
                 else if (_asm.ActiveSpare == _asm.ActiveTire) state = "Same as fitted tyres";
                 else state = Mathf.Abs(v.ForwardSpeed) > 1.5f ? "Stop, then press T to fit" : "Press T to fit";
-                _spareState.text = state;
+                SetText(_spareState, state);
                 _spareFill.style.width = Length.Percent((runner ? runner.SwapProgress : 0f) * 100f);
                 _spare.style.opacity = runner && runner.SpareUsed && !runner.Swapping ? 0.45f : 1f;
             }
@@ -201,42 +246,47 @@ namespace Offroad.UI
             // Hint fades after a while.
             if (Time.unscaledTime - _shownAt > 9f) _hint.RemoveFromClassList("shown");
 
-            // FPS.
-            float dt = Time.unscaledDeltaTime;
-            if (dt > 0f) _fpsSmoothed = Mathf.Lerp(_fpsSmoothed, 1f / dt, 0.05f);
-            _fpsTimer += dt;
-            if (_fpsTimer > 0.25f)
-            {
-                _fpsTimer = 0f;
-                _fps.text = GameSettings.Current.showFps ? $"{_fpsSmoothed:0} FPS  ·  {1000f / Mathf.Max(_fpsSmoothed, 1f):0.0} ms" : "";
-            }
         }
 
-        void UpdateMarkers(Vector3 pos, float yaw, float pxPerDeg, MissionRunner runner)
+        /// <summary>Choose which targets the compass markers show and set their labels (at the text rate).</summary>
+        void AssignMarkers(Vector3 pos, MissionRunner runner)
         {
             int used = 0;
+            int max = Mathf.Min(_markers.Count, _markerTarget.Length);
             Vector3? objective = runner ? runner.Target : null;
-            if (objective.HasValue) Place(_markers[used++], objective.Value, pos, yaw, pxPerDeg, "•  " + FormatDistance(Vector3.Distance(Flat(objective.Value), Flat(pos))), true);
+            if (objective.HasValue)
+            {
+                SetMarker(used++, objective.Value, "•  " + FormatDistance(Vector3.Distance(Flat(objective.Value), Flat(pos))), true);
+            }
 
             // Nearby landmarks: "?" until discovered.
-            var nearby = new List<(float d, Landmark l)>();
+            _nearby.Clear();
             foreach (var l in Landmark.All)
             {
                 if (l.reward <= 0) continue;
                 float d = Vector3.Distance(Flat(l.transform.position), Flat(pos));
-                if (d < 700f) nearby.Add((d, l));
+                if (d < 700f) _nearby.Add((d, l));
             }
-            nearby.Sort((a, b) => a.d.CompareTo(b.d));
-            foreach (var (d, l) in nearby)
+            _nearby.Sort((a, b) => a.d.CompareTo(b.d));
+            foreach (var (d, l) in _nearby)
             {
-                if (used >= _markers.Count) break;
+                if (used >= max) break;
                 if (objective.HasValue && Vector3.Distance(Flat(l.transform.position), Flat(objective.Value)) < 5f) continue;
-                Place(_markers[used++], l.transform.position, pos, yaw, pxPerDeg, l.Discovered ? l.displayName : "?", false);
+                SetMarker(used++, l.transform.position, l.Discovered ? l.displayName : "?", false);
             }
             for (int i = used; i < _markers.Count; i++) _markers[i].style.display = DisplayStyle.None;
+            _markersUsed = used;
         }
 
-        static void Place(Label m, Vector3 target, Vector3 pos, float yaw, float pxPerDeg, string text, bool objective)
+        void SetMarker(int i, Vector3 target, string text, bool objective)
+        {
+            _markerTarget[i] = target;
+            _markerObjective[i] = objective;
+            SetText(_markers[i], text);
+            _markers[i].EnableInClassList("objective", objective);
+        }
+
+        static void Place(Label m, Vector3 target, Vector3 pos, float yaw, float pxPerDeg, bool objective)
         {
             Vector3 dir = target - pos;
             float bearing = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
@@ -244,9 +294,7 @@ namespace Offroad.UI
             if (objective) d = Mathf.Clamp(d, -CompassFov * 0.5f + 8f, CompassFov * 0.5f - 8f);
             bool visible = Mathf.Abs(d) < CompassFov * 0.5f - 6f;
             m.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-            m.text = text;
-            m.EnableInClassList("objective", objective);
-            m.style.left = CompassWidth * 0.5f + d * pxPerDeg;
+            if (visible) m.style.left = CompassWidth * 0.5f + d * pxPerDeg;
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);

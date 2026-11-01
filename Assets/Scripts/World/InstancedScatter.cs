@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace Offroad.World
 {
@@ -15,6 +16,9 @@ namespace Offroad.World
         public bool castShadows;
         [Tooltip("Draw distance in metres at Scenery Detail 1.0.")]
         public float drawDistance = 120f;
+        [Tooltip("Optional low-detail mesh used for chunks further than lodDistance.")]
+        public Mesh lodMesh;
+        public float lodDistance = 60f;
         // Per instance: position (3), yaw degrees, scale, up-vector x, up-vector z  = 7 floats.
         public float[] data = Array.Empty<float>();
         public int Count => data.Length / 7;
@@ -39,6 +43,9 @@ namespace Offroad.World
 
         readonly List<Chunk> _chunks = new List<Chunk>();
         readonly Plane[] _planes = new Plane[6];
+
+        /// <summary>Instances drawn last frame (for the performance overlay and tests).</summary>
+        public int DrawnInstances { get; private set; }
 
         void Awake() => Build();
 
@@ -85,24 +92,35 @@ namespace Offroad.World
             GeometryUtility.CalculateFrustumPlanes(cam, _planes);
             Vector3 eye = cam.transform.position;
             float detail = Mathf.Max(QualitySettings.lodBias, 0.3f);
+            // Small scenery only casts shadows inside the shadow range (no point rendering it into
+            // cascades where its shadow would be culled or sub-pixel anyway).
+            float shadowD = QualitySettings.renderPipeline is UniversalRenderPipelineAsset urp ? urp.shadowDistance : 0f;
+            float shadowSq = shadowD * shadowD;
+            float farSq = cam.farClipPlane * cam.farClipPlane;
+            int drawn = 0;
             foreach (var c in _chunks)
             {
                 float maxD = c.proto.drawDistance * detail;
-                if (c.bounds.SqrDistance(eye) > maxD * maxD) continue;
+                float d2 = c.bounds.SqrDistance(eye);
+                if (d2 > maxD * maxD || d2 > farSq) continue;
                 if (!GeometryUtility.TestPlanesAABB(_planes, c.bounds)) continue;
-                var mesh = c.proto.mesh;
+                float lodD = c.proto.lodDistance * detail;
+                var mesh = c.proto.lodMesh != null && d2 > lodD * lodD ? c.proto.lodMesh : c.proto.mesh;
+                bool shadows = c.proto.castShadows && d2 < shadowSq;
+                drawn += c.matrices.Length;
                 for (int s = 0; s < mesh.subMeshCount && s < c.proto.materials.Length; s++)
                 {
                     var rp = new RenderParams(c.proto.materials[s])
                     {
                         worldBounds = c.bounds,
-                        shadowCastingMode = c.proto.castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off,
+                        shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off,
                         receiveShadows = true,
                         layer = gameObject.layer,
                     };
                     Graphics.RenderMeshInstanced(rp, mesh, s, c.matrices);
                 }
             }
+            DrawnInstances = drawn;
         }
 
         public int TotalInstances

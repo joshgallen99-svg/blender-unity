@@ -290,6 +290,16 @@ def dead_tree(name, seed, M):
     return obj
 
 
+def lod_copy(obj, ratio):
+    """Low-detail copy for distant instances (exported as <name>_LOD1)."""
+    c = obj.copy()
+    c.data = obj.data.copy()
+    c.name = obj.name + "_LOD1"
+    bpy.context.collection.objects.link(c)
+    decimate(c, ratio)
+    return c
+
+
 def build():
     C.reset_scene()
     M = palette()
@@ -314,6 +324,8 @@ def build():
     objs.append(yucca("Yucca_1", 81, M, stalk=True))
     objs.append(dead_tree("DeadTree_0", 90, M))
     objs.append(dead_tree("DeadTree_1", 91, M))
+    # Distant versions of the rocks that appear in large numbers.
+    objs += [lod_copy(o, 0.28) for o in list(objs) if o.name.split("_")[0] in ("Boulder", "Slab", "Hoodoo")]
     return objs
 
 
