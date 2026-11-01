@@ -1,6 +1,6 @@
 {
   "name": "EditModeTests",
-  "references": ["Game", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "references": ["Game", "Game.Editor", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
   "includePlatforms": ["Editor"],
   "overrideReferences": true,
   "precompiledReferences": ["nunit.framework.dll"],

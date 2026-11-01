@@ -1,4 +1,4 @@
-name: Test and build WebGL
+name: Test and build
 
 on:
   push:
@@ -25,7 +25,10 @@ env:
 
 jobs:
   test-and-build:
+    name: Tests + WebGL build
     runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.check.outputs.ok }}
     timeout-minutes: 60
     steps:
       - name: Skip if Unity secrets are missing
@@ -41,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.check.outputs.ok == 'true'
         with:
-          lfs: true
+          lfs: false
 
       - uses: actions/cache@v4
         if: steps.check.outputs.ok == 'true'
@@ -54,7 +57,7 @@ jobs:
         if: steps.check.outputs.ok == 'true'
         uses: game-ci/unity-test-runner@v4
         with:
-          testMode: editmode
+          testMode: all
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build WebGL
@@ -117,3 +120,40 @@ jobs:
           git add -A
           git commit -qm "Unity reference assemblies"
           git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" unity-refs
+
+  build-mac:
+    name: Mac app build
+    needs: test-and-build
+    if: github.ref == 'refs/heads/main' && needs.test-and-build.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Mac-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: Library-Mac-
+
+      - name: Build macOS app
+        uses: game-ci/unity-builder@v4
+        with:
+          targetPlatform: StandaloneOSX
+          buildMethod: BuildScript.BuildMac
+          buildName: Offroad
+          versioning: None
+          allowDirtyBuild: true
+
+      - name: Package app (tar keeps the executable bit)
+        run: |
+          APP=$(sudo find build -maxdepth 4 -name "*.app" -type d | head -1)
+          echo "Found app: $APP"
+          sudo tar -czf "$RUNNER_TEMP/Offroad-Expedition-mac.tar.gz" -C "$(dirname "$APP")" "$(basename "$APP")"
+          ls -lh "$RUNNER_TEMP/Offroad-Expedition-mac.tar.gz"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Offroad-Expedition-mac
+          path: ${{ runner.temp }}/Offroad-Expedition-mac.tar.gz
+          retention-days: 30

@@ -33,3 +33,7 @@ sysinfo.txt
 node_modules/
 /playtest-output/
 /webgl-build/
+
+# Python
+__pycache__/
+*.pyc

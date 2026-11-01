@@ -1,0 +1,97 @@
+using System.IO;
+using System.Linq;
+using NUnit.Framework;
+using Offroad.EditorTools;
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>Checks that the Blender/Python outputs import into Unity the way the game expects.</summary>
+public class GeneratedAssetTests
+{
+    const string Vehicle = "Assets/Models/Vehicles/Ridgeback.fbx";
+    const string Props = "Assets/Models/Props/DesertProps.fbx";
+
+    static Mesh MeshOf(string model, string child, out Material[] mats)
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>(model);
+        Assert.IsNotNull(go, $"{model} should import");
+        var t = go.transform.Find(child);
+        Assert.IsNotNull(t, $"{model} should contain '{child}'");
+        mats = t.GetComponent<MeshRenderer>().sharedMaterials;
+        return t.GetComponent<MeshFilter>().sharedMesh;
+    }
+
+    [Test]
+    public void VehicleFacesForwardAndIsUpright()
+    {
+        var body = MeshOf(Vehicle, "Body", out var mats);
+        var b = body.bounds;
+        Assert.Greater(b.size.z, b.size.x * 1.8f, "vehicle length should run along Z");
+        Assert.That(b.size.y, Is.InRange(2.0f, 3.2f), "height (incl. antenna) in metres");
+        Assert.That(b.min.y, Is.InRange(0.25f, 0.6f), "underside sits above the ground plane");
+
+        int lights = System.Array.FindIndex(mats, m => m && m.name == "Lights");
+        Assert.GreaterOrEqual(lights, 0, "Body should have a 'Lights' material");
+        var verts = body.vertices;
+        var tris = body.GetTriangles(lights);
+        float z = tris.Average(i => verts[i].z);
+        Assert.Greater(z, 0.5f, "lights centre should be toward +Z overall (front headlights dominate)");
+        var head = tris.Select(i => verts[i]).Where(v => v.y < 1.3f).ToArray();
+        Assert.Greater(head.Length, 0);
+        Assert.Greater(head.Average(v => v.z), 1.9f, "headlights must be at the front (+Z)");
+    }
+
+    [Test]
+    public void WheelMarkersMatchRigDefaults()
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>(Vehicle);
+        string[] names = { "WheelFL", "WheelFR", "WheelRL", "WheelRR" };
+        for (int i = 0; i < 4; i++)
+        {
+            var t = go.transform.Find(names[i]);
+            Assert.IsNotNull(t, names[i]);
+            Assert.Less((t.localPosition - Offroad.Vehicles.VehicleRig.DefaultWheelPositions[i]).magnitude, 0.05f,
+                $"{names[i]} at {t.localPosition}");
+        }
+    }
+
+    [Test]
+    public void WheelShowFaceIsOnLeft()
+    {
+        var wheel = MeshOf(Vehicle, "Wheel", out var mats);
+        int cap = System.Array.FindIndex(mats, m => m && m.name == "Steel");
+        Assert.GreaterOrEqual(cap, 0);
+        var verts = wheel.vertices;
+        float x = wheel.GetTriangles(cap).Average(i => verts[i].x);
+        Assert.Less(x, 0f, "hub cap / bolts should face -X (vehicle left) so the rig can mirror right wheels");
+    }
+
+    [Test]
+    public void AllPropVariantsExist()
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>(Props);
+        Assert.IsNotNull(go);
+        foreach (var n in new[] { "Boulder_0", "Boulder_4", "Rock_0", "Rock_4", "Scrub_0", "Scrub_2", "Yucca_0", "Yucca_1", "DeadTree_0", "DeadTree_1" })
+        {
+            var t = go.transform.Find(n);
+            Assert.IsNotNull(t, n);
+            Assert.GreaterOrEqual(t.GetComponent<MeshFilter>().sharedMesh.bounds.min.y, -0.05f, $"{n} pivot should be at its base");
+        }
+    }
+
+    [Test]
+    public void TerrainSourceDataIsConsistent()
+    {
+        var info = JsonUtility.FromJson<PrototypeSceneBuilder.RegionInfo>(File.ReadAllText("Assets/Terrain/Source~/desert_info.json"));
+        Assert.AreEqual(info.resolution * info.resolution * 2, new FileInfo("Assets/Terrain/Source~/desert_height.r16").Length);
+        Assert.AreEqual(4, info.layers.Length);
+        foreach (var l in info.layers)
+        {
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{l}_albedo.png"), l);
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{l}_normal.png"), l);
+        }
+        var scatter = JsonUtility.FromJson<PrototypeSceneBuilder.ScatterFile>(File.ReadAllText("Assets/Terrain/Source~/desert_scatter.json"));
+        Assert.Greater(scatter.props.Length, 1000);
+        Assert.That(info.spawn.x, Is.InRange(50f, info.size - 50f));
+    }
+}

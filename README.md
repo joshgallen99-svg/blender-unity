@@ -1,39 +1,60 @@
-# blender-unity
+# Offroad Expedition (working title)
 
-A Unity game with assets made from Blender scripts. Heavy work (modelling, rendering, builds) runs in the cloud. A Mac only opens the project and plays it.
+An open-world off-road driving game built with **Blender** (models, generated from Python scripts) and **Unity 6 + URP**. It is designed to run well on a MacBook Air.
 
-## Layout
+Heavy work runs in the cloud: models are generated with Blender's Python module, and GitHub Actions builds and tests the Unity project. Your Mac only runs the finished game.
+
+## Playing the latest build
+
+1. Open the repo's **Actions** tab on GitHub and click the latest green **Test and build** run.
+2. Under **Artifacts**, download **Offroad-Expedition-mac** (native Mac app, best performance) or **WebGL** (browser version).
+3. Mac app: double-click the `.tar.gz` to unpack it. The first time, right-click the app, choose **Open**, then **Open** again. The app isn't signed, so macOS asks once.
+
+### Controls
+
+| Action | Keyboard | Gamepad |
+|---|---|---|
+| Accelerate / brake & reverse | W / S (or arrows) | Right / left trigger |
+| Steer | A / D | Left stick |
+| Handbrake | Space | B |
+| Reset vehicle | R | Y |
+| Look around | Mouse | Right stick |
+| Pause, settings and graphics presets | Esc or P | Start |
+| FPS counter | F1 | |
+
+Graphics presets: **Battery Saver** (30 FPS cap, runs cool), **Low**, **Medium** (default on Mac), **High**, and individual options.
+
+## Project layout
 
 | Path | What |
 |---|---|
-| `Assets/` | Unity project: scripts, scenes, models |
-| `blender/` | Python scripts that generate models into `Assets/Models/` |
-| `tools/playtest.js` | Serves a WebGL build in headless Chrome and takes screenshots |
-| `.github/workflows/build.yml` | Runs tests and a WebGL build on every push |
+| `blender/vehicles/` | Vehicle models (the Ridgeback 4x4) |
+| `blender/props/` | Scenery: rocks, boulders, scrub, yuccas, dead trees |
+| `blender/preview/` | Quick Cycles renders for reviewing models |
+| `tools/terrain/` | Terrain generator: heightmap, paint layers, ground textures, prop placement |
+| `Assets/Scripts/` | Game code: vehicle physics, camera, settings, HUD, atmosphere |
+| `Assets/Editor/` | Builds the scene, materials, prefabs and project settings from code |
+| `Assets/Tests/` | Edit-mode asset checks and play-mode vehicle physics tests |
+| `tools/playtest.js` | Loads a WebGL build in headless Chrome and takes screenshots |
+| `tools/compile-check/` | Compiles the C# against Unity's libraries without Unity |
 
-Unity version: **6000.0.32f1** (Unity 6). Install that version through Unity Hub.
+### How the scene is made
 
-## One-time setup: Unity licence for GitHub builds
+The Unity scene isn't edited by hand. `Assets/Editor/PrototypeSceneBuilder.cs` builds it from the generated data. In the Unity editor, use **Offroad → Rebuild Prototype Scene**. CI runs the same builder before every build. When the project is opened for the first time, the scene is generated automatically.
 
-The build workflow skips itself until these secrets exist. Add them in the repo on GitHub: **Settings → Secrets and variables → Actions → New repository secret**.
-
-1. `UNITY_EMAIL`: your Unity account email.
-2. `UNITY_PASSWORD`: your Unity account password.
-3. `UNITY_LICENSE`: the full contents of your Unity licence file.
-   - Sign in to Unity Hub on your Mac and activate a free **Personal** licence (Hub → Settings → Licenses → Add).
-   - Open `/Library/Application Support/Unity/Unity_lic.ulf` in TextEdit and paste the whole file as the secret's value.
-
-After that, every push builds a WebGL version, downloadable from the **Actions** tab as the `WebGL` artifact.
-
-## Making models
+### Regenerating assets
 
 ```bash
-pip install bpy
-python blender/example_rock.py
+pip install bpy numpy scipy pillow
+tools/generate_all.sh
 ```
 
-## Playtesting a build
+## Cloud builds (one-time setup)
 
-```bash
-node tools/playtest.js path/to/WebGL-build playtest-output 20
-```
+The workflow needs three repository secrets (**Settings → Secrets and variables → Actions**): `UNITY_EMAIL`, `UNITY_PASSWORD`, and `UNITY_LICENSE` (the contents of `/Library/Application Support/Unity/Unity_lic.ulf` after activating a free Personal license in Unity Hub). Each push to `main` then:
+
+1. runs all tests (asset checks + vehicle physics),
+2. builds WebGL and publishes it to the `webgl-build` branch for automated playtesting,
+3. builds the native Mac app (artifact `Offroad-Expedition-mac`).
+
+Unity version: **6000.0.32f1**.

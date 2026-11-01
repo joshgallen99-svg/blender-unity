@@ -1,0 +1,17 @@
+{
+  "size": 1024.0,
+  "height": 160.0,
+  "resolution": 1025,
+  "splatResolution": 512,
+  "layers": [
+    "Sand",
+    "Gravel",
+    "CrackedSoil",
+    "RedRock"
+  ],
+  "spawn": {
+    "x": 485.74,
+    "z": 445.19,
+    "yaw": -68.9
+  }
+}
