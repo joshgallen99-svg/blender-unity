@@ -61,7 +61,7 @@ Shader "Offroad/Sky"
                 // Gradient, a little lower and warmer on the sun's side of the sky.
                 half3 col = lerp(_HorizonColor.rgb, _ZenithColor.rgb, pow(up, _GradientPower));
                 half sunSide = pow(saturate(mu * 0.5 + 0.5), 3.0) * (1.0 - up);
-                col = lerp(col, col * lerp(half3(1, 1, 1), _SunGlowColor.rgb * 1.15, 0.45), sunSide);
+                col = lerp(col, col * lerp(half3(1, 1, 1), _SunGlowColor.rgb * 1.15, 0.22), sunSide);
 
                 // Haze band hugging the horizon (matches the fog), and the ground below it.
                 half haze = exp(-abs(d.y) * _HazeHeight) * _HazeAmount;
@@ -70,8 +70,9 @@ Shader "Offroad/Sky"
 
                 // Sun: broad Mie glow (stronger when the sun is low), a tight halo and the disc itself.
                 half lowSun = 1.0 - saturate(s.y * 2.5);
-                half glow = pow(saturate(mu), 6.0) * (0.25 + 0.55 * lowSun) + pow(saturate(mu), 48.0) * 0.6;
-                col += _SunGlowColor.rgb * glow * _GlowAmount * (0.6 + 0.4 * (1.0 - up));
+                // Blend toward the glow colour (not add: warm on blue would turn magenta).
+                half glow = pow(saturate(mu), 10.0) * (0.22 + 0.5 * lowSun) + pow(saturate(mu), 64.0) * 0.75;
+                col = lerp(col, _SunGlowColor.rgb * 1.4, saturate(glow * _GlowAmount * (0.6 + 0.4 * (1.0 - up))));
                 half disc = smoothstep(cos(_SunSize * 1.35), cos(_SunSize), mu) * step(-0.01, d.y);
                 col += sun.color * disc * _SunIntensity;
 
