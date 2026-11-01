@@ -59,6 +59,8 @@ jobs:
           targetPlatform: WebGL
           buildMethod: BuildScript.BuildWebGL
           buildName: WebGL
+          versioning: None
+          allowDirtyBuild: true
         env:
           BUILD_PATH: build/WebGL/WebGL
 
