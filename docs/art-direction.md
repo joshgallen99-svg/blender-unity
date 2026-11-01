@@ -76,6 +76,30 @@ brittlebush. Sky: deep blue overhead, pale blue haze at the horizon.
 | Foliage sprites | `tools/art/generate_foliage_textures.py` |
 | Composition preview (Blender) | `blender/preview/render_scene.py` |
 
+## Cedar Hollow (forest river valley)
+
+Reference points: Sierra Nevada and Cascades valleys: granite domes above fir forest, a clear river
+over pale gravel bars, meadows with aspen groves, logging-era tracks with fords and timber bridges.
+
+- **Composition.** The river is the spine: valley floor of meadows and gravel bars, firs climbing the
+  slopes to granite crags and two domes, a cliff band and waterfall closing the valley in the north.
+- **Trees** are the forest's "formations": firs (16-24 m, V-shaped needle sprays around a hidden trunk)
+  drawn with GPU instancing at three detail levels: full cards close up, sparser cards mid-range, and
+  rendered impostor cards (from Cycles side renders) to the horizon. Aspens add yellow-green near water.
+- **Water** reads depth from the terrain heightmap: clear over the gravel at the edges, dark green-blue
+  in the pools, foam in shallows, rapids and below the falls, sky reflected by Fresnel.
+- **Soft ground everywhere**: forest soil and mud take deep ruts (tyre trails), fords cross the river at
+  under a metre, mud holes sit in the low spots of the tracks.
+- **Light**: cooler morning sun from the south-east, blue-grey haze, snow on the distant ranges.
+
+| What | Generator |
+|---|---|
+| Region layout, river, tracks, hazards, scatter | `tools/terrain/generate_forest.py` |
+| Ground textures, bark, foliage, water | `tools/art/generate_forest_textures.py` |
+| Firs (+ impostors), aspens, logs, boulders, understorey | `blender/props/forest_props.py` |
+| Granite domes, crags, tors, waterfall cliff | `blender/formations/granite_formations.py` |
+| Cabin, lookout, bridge, log piles | `blender/landmarks/forest_landmarks.py` |
+
 ## Third-party sources
 
 Only used where they fit the palette and shapes exactly; everything else is made here.
@@ -83,3 +107,8 @@ Only used where they fit the palette and shapes exactly; everything else is made
 | Asset | Source | Licence | Used for |
 |---|---|---|---|
 | Ground054 (sand scan) | [ambientCG](https://ambientcg.com/view?id=Ground054) | CC0 1.0 | Sand grain and surface relief, high-passed and re-coloured to our palette (`tools/art/sources/ambientcg/`) |
+| Ground037 (forest floor) | [ambientCG](https://ambientcg.com/view?id=Ground037) | CC0 1.0 | Forest floor and meadow |
+| Ground048 (forest soil) | [ambientCG](https://ambientcg.com/view?id=Ground048) | CC0 1.0 | Track soil and wet mud |
+| Rock030 (rock) | [ambientCG](https://ambientcg.com/view?id=Rock030) | CC0 1.0 | Granite, cooled |
+| Gravel021 (gravel) | [ambientCG](https://ambientcg.com/view?id=Gravel021) | CC0 1.0 | River gravel, lightened, silt added |
+| Bark001 (bark) | [ambientCG](https://ambientcg.com/view?id=Bark001) | CC0 1.0 | Fir bark, re-coloured |
