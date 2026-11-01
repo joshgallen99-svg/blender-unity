@@ -14,6 +14,7 @@ namespace Offroad.Vehicles
         public float mud;        // 0..1 wet mud / standing water: slippery, sticky, wheels sink a little
         public float quicksand;  // 0..1 quicksand: wheels sink steadily unless the vehicle keeps moving
         public float washboard;  // 0..1 corrugations: rattles the suspension, costs grip at speed
+        public float sink;       // how far a tyre settles into this ground at rest (m): sand, soft soil
 
         public static readonly SurfaceInfo Default = new SurfaceInfo
         {
@@ -31,6 +32,7 @@ namespace Offroad.Vehicles
             mud = Mathf.Lerp(a.mud, b.mud, t),
             quicksand = Mathf.Lerp(a.quicksand, b.quicksand, t),
             washboard = Mathf.Lerp(a.washboard, b.washboard, t),
+            sink = Mathf.Lerp(a.sink, b.sink, t),
         };
     }
 

@@ -56,6 +56,8 @@ namespace Offroad.Vehicles
         [Header("Wheels")]
         public Wheel[] wheels = Array.Empty<Wheel>();
         public float wheelRadius = 0.43f;
+        [Tooltip("Tread width (m): how wide a track the tyres press into soft ground.")]
+        public float tireWidth = 0.32f;
 
         [Header("Suspension")]
         [Tooltip("Total wheel travel in metres.")]
@@ -397,7 +399,7 @@ namespace Offroad.Vehicles
                 w.quickSink = Mathf.Clamp(w.quickSink + pull * w.surface.quicksand * dt, 0f, quicksandMaxSink);
             }
             else w.quickSink = Mathf.MoveTowards(w.quickSink, 0f, 0.6f * dt);
-            float target = w.surface.mud * mudSinkDepth + w.quickSink;
+            float target = w.surface.sink + w.surface.mud * mudSinkDepth + w.quickSink;
             w.sink = Mathf.MoveTowards(w.sink, target, 0.5f * dt);
             if (w.surface.washboard > 0.01f) w.washPhase += Mathf.Abs(w.forwardSpeed) * dt / washboardSpacing;
         }

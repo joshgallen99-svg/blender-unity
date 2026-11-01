@@ -19,6 +19,7 @@ namespace Offroad.Garage
             public float rolling;         // multiplies rolling resistance (top speed / efficiency)
             public float mudGrip = 1f;    // grip multiplier in mud and quicksand
             public float radius;
+            public float width = 0.3f;    // tread width (m): the track it leaves in soft ground
             public int[] upgradeCost;     // per level above 0
             public float GripPerLevel => 0.06f;
         }
@@ -70,21 +71,21 @@ namespace Offroad.Garage
         {
             new TireDef
             {
-                id = "at", name = "Trailhound A/T", mesh = "Wheel_AT", price = 0, radius = 0.43f,
+                id = "at", name = "Trailhound A/T", mesh = "Wheel_AT", price = 0, radius = 0.43f, width = 0.3f,
                 blurb = "All-terrain all-rounder. Good everywhere, best nowhere.",
                 grip = new Vector4(0.92f, 1.0f, 1.0f, 1.0f), sandDrag = 1.0f, rolling = 1.0f, mudGrip = 0.95f,
                 upgradeCost = new[] { 180, 320 },
             },
             new TireDef
             {
-                id = "mt", name = "Gripjaw M/T", mesh = "Wheel_MT", price = 450, radius = 0.44f,
+                id = "mt", name = "Gripjaw M/T", mesh = "Wheel_MT", price = 450, radius = 0.44f, width = 0.34f,
                 blurb = "Big-block crawler. Claws up rock and through mud, but digs into soft sand.",
                 grip = new Vector4(0.76f, 1.0f, 1.08f, 1.25f), sandDrag = 1.3f, rolling = 1.15f, mudGrip = 1.3f,
                 upgradeCost = new[] { 220, 380 },
             },
             new TireDef
             {
-                id = "dune", name = "Dunerunner", mesh = "Wheel_Dune", price = 400, radius = 0.44f,
+                id = "dune", name = "Dunerunner", mesh = "Wheel_Dune", price = 400, radius = 0.44f, width = 0.42f,
                 blurb = "Wide paddle tyre. Floats over dunes; slides around on bare rock and in mud.",
                 grip = new Vector4(1.2f, 0.9f, 0.95f, 0.76f), sandDrag = 0.5f, rolling = 0.95f, mudGrip = 0.75f,
                 upgradeCost = new[] { 200, 350 },

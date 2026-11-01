@@ -766,6 +766,9 @@ namespace Offroad.EditorTools
             var go = new GameObject("Systems");
             go.AddComponent<Atmosphere>();
             go.AddComponent<DiscoveryTracker>().player = vehicle.transform;
+            var trails = go.AddComponent<GroundTrails>();     // tyre tracks pressed into soft ground
+            trails.stampShader = Shader.Find("Hidden/Offroad/TrailStamp");
+            if (trails.stampShader == null) Debug.LogWarning("[Offroad] Trail stamp shader missing");
             var runner = go.AddComponent<Game.MissionRunner>();
             runner.vehicle = vehicle;
 

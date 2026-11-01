@@ -14,20 +14,22 @@ namespace Offroad.World
             public string name;
             public float grip, traction, drag, dust;
             public Color dustColor;
+            [Tooltip("How far a tyre settles into this ground (m).")]
+            public float sink;
 
-            public LayerSurface(string name, float grip, float traction, float drag, float dust, Color dustColor)
+            public LayerSurface(string name, float grip, float traction, float drag, float dust, Color dustColor, float sink = 0f)
             {
                 this.name = name; this.grip = grip; this.traction = traction; this.drag = drag;
-                this.dust = dust; this.dustColor = dustColor;
+                this.dust = dust; this.dustColor = dustColor; this.sink = sink;
             }
         }
 
         public LayerSurface[] layers =
         {
-            new LayerSurface("Sand", 0.84f, 0.8f, 0.55f, 1.0f, new Color(0.86f, 0.62f, 0.42f)),
-            new LayerSurface("Gravel", 0.93f, 0.95f, 0.08f, 0.7f, new Color(0.64f, 0.54f, 0.45f)),
-            new LayerSurface("CrackedSoil", 1.0f, 1.0f, 0.03f, 0.85f, new Color(0.80f, 0.66f, 0.52f)),
-            new LayerSurface("RedRock", 1.12f, 1.0f, 0.0f, 0.25f, new Color(0.62f, 0.38f, 0.27f)),
+            new LayerSurface("Sand", 0.84f, 0.8f, 0.55f, 1.0f, new Color(0.86f, 0.62f, 0.42f), 0.035f),
+            new LayerSurface("Gravel", 0.93f, 0.95f, 0.08f, 0.7f, new Color(0.64f, 0.54f, 0.45f), 0.008f),
+            new LayerSurface("CrackedSoil", 1.0f, 1.0f, 0.03f, 0.85f, new Color(0.80f, 0.66f, 0.52f), 0.012f),
+            new LayerSurface("RedRock", 1.12f, 1.0f, 0.0f, 0.25f, new Color(0.62f, 0.38f, 0.27f), 0f),
         };
         public LayerSurface objects = new LayerSurface("Rock", 1.1f, 1.0f, 0f, 0.15f, new Color(0.6f, 0.4f, 0.3f));
 
@@ -75,12 +77,13 @@ namespace Offroad.World
                 s.drag += l.drag * wgt;
                 s.dust += l.dust * wgt;
                 s.dustColor += l.dustColor * wgt;
+                s.sink += l.sink * wgt;
                 s.layers[i] = wgt;
                 total += wgt;
             }
             if (total <= 1e-4f) return SurfaceInfo.Default;
             float inv = 1f / total;
-            s.grip *= inv; s.traction *= inv; s.drag *= inv; s.dust *= inv;
+            s.grip *= inv; s.traction *= inv; s.drag *= inv; s.dust *= inv; s.sink *= inv;
             s.dustColor *= inv;
             s.dustColor.a = 1f;
             if (hazardMap != null) ApplyHazards(ref s, local.x / td.size.x, local.z / td.size.z);

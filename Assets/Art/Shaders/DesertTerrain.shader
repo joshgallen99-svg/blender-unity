@@ -58,6 +58,7 @@ Shader "Offroad/DesertTerrain"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Desert.hlsl"
+            #include "Trails.hlsl"
 
             TEXTURE2D(_Mask); SAMPLER(sampler_Mask);
             TEXTURE2D(_Macro); SAMPLER(sampler_Macro);
@@ -108,6 +109,12 @@ Shader "Offroad/DesertTerrain"
                 float2 dpx = ddx(p.xz);
                 float2 dpy = ddy(p.xz);
                 half3 w = max(mask.rgb, 0.0001);
+                half4 hz = SAMPLE_TEXTURE2D(_OffroadHazard, sampler_OffroadHazard, i.uvFog.xy) * _OffroadHazardOn;
+
+                // Tyre trails: how deep this ground lets a tyre sink (sand deep, dry mud and pavement
+                // shallow, rock not at all), then look into the ruts with parallax.
+                half softP = (w.x * 0.06 + w.y * 0.015 + w.z * 0.02) * (1.0 - mask.a) + hz.r * 0.06 + hz.g * 0.04;
+                p.xz = TrailParallax(p.xz, GetWorldSpaceNormalizeViewDir(i.positionWS), softP);
 
                 // --- Ground layers (top-down, hex-tiled so they never visibly repeat). Layers the mask
                 // doesn't use here are skipped (the branch is coherent: the mask changes slowly).
@@ -188,7 +195,6 @@ Shader "Offroad/DesertTerrain"
                 albedo = lerp(albedo, albedo * half3(1.0, 1.03, 1.08), smoothstep(0.55, 0.85, macro.b) * 0.5 * ground);
 
                 // --- Hazards from the hazard map: wet mud, standing water, quicksand, each with a damp rim.
-                half4 hz = SAMPLE_TEXTURE2D(_OffroadHazard, sampler_OffroadHazard, i.uvFog.xy) * _OffroadHazardOn;
                 half edgeN = (macroS.g - 0.5) * 0.35 + (macro2.r - 0.5) * 0.2;
                 half mudW = smoothstep(0.35, 0.65, hz.r + edgeN) * ground;
                 half quickW = smoothstep(0.3, 0.6, hz.g + edgeN * 0.6) * ground;
@@ -217,6 +223,15 @@ Shader "Offroad/DesertTerrain"
                 smooth = lerp(smooth, 0.96, waterW);
                 normalWS = normalize(lerp(normalWS, normalize(half3(0, 1, 0) + wn), waterW));
 
+                // Tyre trails: rut walls and rims bend the normal; ruts are darker (compacted, damp),
+                // rims a little lighter (loose); in mud the ruts hold water.
+                half soft = (bw.x * 0.06 + bw.y * 0.015 + bw.z * 0.02) * ground + mudW * 0.04 + quickW * 0.03;
+                TrailInfo trail = SampleTrail(i.positionWS.xz, soft);
+                normalWS = normalize(normalWS + half3(-trail.grad.x, 0, -trail.grad.y));
+                albedo *= 1.0 - (0.16 + 0.25 * mudW) * trail.depth * saturate(soft * 25.0);
+                albedo *= 1.0 + 0.06 * trail.rim * saturate(soft * 25.0);
+                smooth = lerp(smooth, 0.75, trail.depth * mudW);
+
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = albedo;
                 s.smoothness = smooth;
@@ -225,11 +240,11 @@ Shader "Offroad/DesertTerrain"
                 s.alpha = 1;
 
                 InputData d = (InputData)0;
-                d.positionWS = p;
+                d.positionWS = i.positionWS;
                 d.positionCS = i.positionCS;
                 d.normalWS = normalWS;
-                d.viewDirectionWS = GetWorldSpaceNormalizeViewDir(p);
-                d.shadowCoord = TransformWorldToShadowCoord(p);
+                d.viewDirectionWS = GetWorldSpaceNormalizeViewDir(i.positionWS);
+                d.shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 d.fogCoord = i.uvFog.z;
                 d.bakedGI = SampleSH(normalWS);
                 d.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(i.positionCS);

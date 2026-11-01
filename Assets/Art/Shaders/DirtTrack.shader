@@ -44,6 +44,7 @@ Shader "Offroad/DirtTrack"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Desert.hlsl"
+            #include "Trails.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float _DirtScale, _SandScale;
@@ -158,10 +159,17 @@ Shader "Offroad/DirtTrack"
                 col = lerp(col, half3(0.045, 0.045, 0.05), puddle);
                 smooth = lerp(smooth, 0.95, puddle);
 
+                // --- Tyre trails over the track (packed dirt takes shallow ruts; wet ground deeper).
+                half soft = 0.025 + 0.05 * wet;
+                TrailInfo trail = SampleTrail(p.xz, soft);
+                col *= 1.0 - (0.12 + 0.25 * wet) * trail.depth;
+                smooth = lerp(smooth, 0.8, trail.depth * wet);
+
                 // --- Normal: base terrain normal, bent by the profile and the dirt texture.
                 half3 nrm = normalize(n - across * dhdlat - alongDir * dhdalong);
                 half3 tn = dirtN;
                 nrm = normalize(nrm + (across * tn.x + alongDir * tn.y) * (1.0 - loose * 0.5) * (1.0 - puddle));
+                nrm = normalize(nrm + half3(-trail.grad.x, 0, -trail.grad.y));
 
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = col;
