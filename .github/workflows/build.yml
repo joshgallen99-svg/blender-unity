@@ -59,6 +59,7 @@ jobs:
         with:
           testMode: all
           githubToken: ${{ secrets.GITHUB_TOKEN }}
+          cliVersion: 0.1.72
 
       - name: Build WebGL
         if: steps.check.outputs.ok == 'true'
