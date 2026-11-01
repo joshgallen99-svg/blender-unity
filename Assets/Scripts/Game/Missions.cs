@@ -33,7 +33,7 @@ namespace Offroad.Game
             {
                 id = "needle", title = "Thread the Needle", reward = 250,
                 brief = "Head north to the great sandstone arch and drive through the Needle's Eye.",
-                tip = "Follow the cairns up the wash, then cut across the plain.",
+                tip = "Follow the old highway north through the valley, then turn east into mesa country.",
                 targets = new[] { "needles_eye" },
             },
             new MissionDef
@@ -53,7 +53,7 @@ namespace Offroad.Game
             new MissionDef
             {
                 id = "chimneys", title = "Into the Chimneys", reward = 400,
-                brief = "Pick a line through the hoodoo field in the south-west and reach Balanced Rock.",
+                brief = "Pick a line through the hoodoo field in the south-west and reach Balanced Rock. Swing past the striped slickrock of The Wave on the way.",
                 tip = "Sand on the way, rock at the end. A good moment for the spare-wheel swap.",
                 targets = new[] { "chimneys" },
             },

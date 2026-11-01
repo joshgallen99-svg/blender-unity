@@ -6,7 +6,7 @@ namespace Offroad.EditorTools
     /// <summary>Import settings for generated models and textures, so nothing needs hand-tuning.</summary>
     public class AssetImportRules : AssetPostprocessor
     {
-        public override uint GetVersion() => 4;
+        public override uint GetVersion() => 5;
 
         void OnPreprocessModel()
         {
@@ -30,11 +30,24 @@ namespace Offroad.EditorTools
         void OnPreprocessTexture()
         {
             var ti = (TextureImporter)assetImporter;
-            if (assetPath.StartsWith("Assets/Terrain/Textures/"))
+            if (assetPath.StartsWith("Assets/Terrain/Masks/"))
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.sRGBTexture = false;
+                ti.mipmapEnabled = true;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.maxTextureSize = 1024;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.alphaSource = TextureImporterAlphaSource.FromInput;
+            }
+            else if (assetPath.StartsWith("Assets/Terrain/Textures/"))
             {
                 bool normal = assetPath.Contains("_normal");
+                bool data = assetPath.Contains("Macro");
                 ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
-                ti.sRGBTexture = !normal;
+                ti.sRGBTexture = !normal && !data;
+                ti.alphaSource = TextureImporterAlphaSource.FromInput;
+                ti.alphaIsTransparency = false;
                 ti.mipmapEnabled = true;
                 ti.anisoLevel = 4;
                 ti.wrapMode = TextureWrapMode.Repeat;

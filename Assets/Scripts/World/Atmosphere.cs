@@ -15,9 +15,9 @@ namespace Offroad.World
     {
         [Header("Grading")]
         public float postExposure = 0.05f;
-        public float contrast = 8f;
-        public float saturation = -6f;
-        public float temperature = 4f;
+        public float contrast = 10f;
+        public float saturation = 2f;
+        public float temperature = 2f;
         public float bloomIntensity = 0.55f;
         public float bloomThreshold = 1.05f;
         public float vignette = 0.22f;

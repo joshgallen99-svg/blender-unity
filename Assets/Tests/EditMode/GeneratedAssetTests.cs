@@ -139,11 +139,21 @@ public class GeneratedAssetTests
         var info = JsonUtility.FromJson<PrototypeSceneBuilder.RegionInfo>(File.ReadAllText("Assets/Terrain/Source~/desert_info.json"));
         Assert.AreEqual(info.resolution * info.resolution * 2, new FileInfo("Assets/Terrain/Source~/desert_height.r16").Length);
         Assert.AreEqual(4, info.layers.Length);
-        foreach (var l in info.layers)
+        foreach (var l in new[] { "Sand", "Mud", "Pavement", "Sandstone" })
         {
             Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{l}_albedo.png"), l);
             Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{l}_normal.png"), l);
         }
+        Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Masks/desert_mask.png"), "render mask");
+        Assert.Greater(info.formations.Length, 30, "the region is built around rock formations");
+        var forms = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Formations/Formations.fbx");
+        Assert.IsNotNull(forms);
+        foreach (var f in info.formations)
+        {
+            Assert.IsNotNull(forms.transform.Find(f.model), f.model);
+            Assert.IsNotNull(forms.transform.Find(f.model + "_LOD1"), f.model + " LOD1");
+        }
+        Assert.Greater(info.roadX.Length, 50, "highway path");
         var scatter = JsonUtility.FromJson<PrototypeSceneBuilder.ScatterFile>(File.ReadAllText("Assets/Terrain/Source~/desert_scatter.json"));
         Assert.Greater(scatter.props.Length, 1000);
         Assert.That(info.spawn.x, Is.InRange(50f, info.size - 50f));

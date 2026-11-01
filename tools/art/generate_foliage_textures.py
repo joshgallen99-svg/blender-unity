@@ -90,7 +90,8 @@ def grass(name, seed):
         bend = rng.normal(0, 0.35) * h * 0.5
         w = rng.uniform(4, 8) * SS
         tone = rng.uniform(0.7, 1.05)
-        col = tuple(int(c) for c in np.clip(np.array([196, 168, 112]) * tone, 0, 255)) + (255,)
+        base = np.array([196, 168, 112]) if rng.random() < 0.6 else np.array([168, 162, 96])   # straw or sage-green
+        col = tuple(int(c) for c in np.clip(base * tone, 0, 255)) + (255,)
         pts = []
         for k in range(9):
             t = k / 8

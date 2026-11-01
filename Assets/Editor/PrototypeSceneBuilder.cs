@@ -30,6 +30,17 @@ namespace Offroad.EditorTools
         const string VehicleModel = "Assets/Models/Vehicles/Fleet.fbx";
         const string PropsModel = "Assets/Models/Props/DesertProps.fbx";
         const string LandmarksModel = "Assets/Models/Landmarks/DesertLandmarks.fbx";
+        const string FormationsModel = "Assets/Models/Formations/Formations.fbx";
+
+        // Small scenery drawn with GPU instancing (no GameObjects, no colliders): name -> draw distance, shadows.
+        static readonly Dictionary<string, (float distance, bool shadows, float align)> Instanced =
+            new Dictionary<string, (float, bool, float)>
+            {
+                ["Grass"] = (110f, false, 0.6f),
+                ["Scrub"] = (220f, true, 0.3f),
+                ["Rock"] = (180f, true, 0.8f),
+                ["Yucca"] = (200f, true, 0.1f),
+            };
 
         [Serializable] public class SpawnInfo { public float x, z, yaw; }
         [Serializable] public class RegionInfo
@@ -40,7 +51,10 @@ namespace Offroad.EditorTools
             public SpawnInfo spawn;
             public LandmarkInfo[] landmarks;
             public PieceInfo[] markers;
+            public FormationInfo[] formations;
+            public float[] roadX, roadZ;
         }
+        [Serializable] public class FormationInfo { public string model; public float x, z, yaw, scale, sink; }
         [Serializable] public class PieceInfo { public string model; public float x, z, yaw, sink, align; }
         [Serializable] public class LandmarkInfo
         {
@@ -86,12 +100,15 @@ namespace Offroad.EditorTools
             AssetDatabase.ImportAsset(VehicleModel, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(PropsModel, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(LandmarksModel, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(FormationsModel, ImportAssetOptions.ForceUpdate);
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var info = ReadJson<RegionInfo>($"{SourceDir}/{Region}_info.json");
 
             var sun = CreateLighting();
             var terrain = CreateTerrain(info);
+            PlaceFormations(terrain, info);
+            CreateRoad(terrain, info);
             PlaceProps(terrain, info);
             PlaceLandmarks(terrain, info);
             var vehicle = CreateVehicle(terrain, info);
@@ -112,24 +129,30 @@ namespace Offroad.EditorTools
             var go = new GameObject("Sun");
             var sun = go.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1f, 0.80f, 0.62f);
-            sun.intensity = 2.1f;
+            sun.color = new Color(1f, 0.92f, 0.80f);
+            sun.intensity = 2.3f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.88f;
-            go.transform.rotation = Quaternion.Euler(22f, 19f, 0f);   // low golden-hour sun, side-on to the spawn heading
+            sun.shadowStrength = 0.9f;
+            go.transform.rotation = Quaternion.Euler(36f, 205f, 0f);   // afternoon sun ahead-right of the highway view
 
             RenderSettings.skybox = MaterialLibrary.Skybox();
             RenderSettings.sun = sun;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.52f, 0.60f, 0.76f);
-            RenderSettings.ambientEquatorColor = new Color(0.72f, 0.57f, 0.45f);
-            RenderSettings.ambientGroundColor = new Color(0.34f, 0.24f, 0.18f);
+            RenderSettings.ambientSkyColor = new Color(0.46f, 0.56f, 0.76f);
+            RenderSettings.ambientEquatorColor = new Color(0.70f, 0.60f, 0.52f);
+            RenderSettings.ambientGroundColor = new Color(0.44f, 0.28f, 0.20f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.86f, 0.70f, 0.57f);
-            RenderSettings.fogStartDistance = 180f;
-            RenderSettings.fogEndDistance = 780f;
+            RenderSettings.fogColor = new Color(0.72f, 0.77f, 0.84f);   // blue aerial haze, as in the reference photo
+            RenderSettings.fogStartDistance = 200f;
+            RenderSettings.fogEndDistance = 900f;
+
+            var backdrop = new GameObject("Distant Ranges").AddComponent<Backdrop>();
+            backdrop.farMaterial = MaterialLibrary.Backdrop("BackdropRanges", new Color(0.56f, 0.61f, 0.74f),
+                new Color(0.38f, 0.45f, 0.60f), new Color(0.74f, 0.79f, 0.87f), 0.5f, 420f);
+            backdrop.midMaterial = MaterialLibrary.Backdrop("BackdropMesas", new Color(0.80f, 0.47f, 0.33f),
+                new Color(0.52f, 0.32f, 0.27f), new Color(0.74f, 0.77f, 0.84f), 0.42f, 180f);
             return sun;
         }
 
@@ -183,23 +206,46 @@ namespace Offroad.EditorTools
             var go = Terrain.CreateTerrainGameObject(td);
             go.name = "Terrain";
             var t = go.GetComponent<Terrain>();
-            t.materialTemplate = MaterialLibrary.Terrain();
-            t.drawInstanced = true;
-            t.heightmapPixelError = 5f;
-            t.basemapDistance = 300f;
+            var mask = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Masks/{Region}_mask.png");
+            if (mask == null) throw new Exception("Terrain mask missing");
+            t.materialTemplate = MaterialLibrary.DesertTerrain(mask);
+            t.drawInstanced = false;            // the desert shader reads regular terrain vertices
+            t.heightmapPixelError = 4f;
+            t.basemapDistance = 20000f;         // never switch to Unity's basemap shader
             t.drawTreesAndFoliage = false;
             t.shadowCastingMode = ShadowCastingMode.On;
             go.AddComponent<TerrainSurfaces>();
+
+            // Heightmap as a texture for the rock shader's sand skirt.
+            var htex = new Texture2D(res, res, TextureFormat.RHalf, false, true)
+            {
+                name = "DesertHeight", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,
+            };
+            var hpx = new Color[res * res];
+            for (int z = 0; z < res; z++)
+            for (int x = 0; x < res; x++)
+                hpx[z * res + x] = new Color(heights[z, x], 0f, 0f, 1f);
+            htex.SetPixels(hpx);
+            htex.Apply(false, false);
+            var hPath = $"{GeneratedDir}/DesertHeight.asset";
+            AssetDatabase.DeleteAsset(hPath);
+            AssetDatabase.CreateAsset(htex, hPath);
+            var globals = go.AddComponent<TerrainGlobals>();
+            globals.terrain = t;
+            globals.heightTexture = htex;
+            globals.Publish();
             return t;
         }
 
         static TerrainLayer CreateLayer(string name)
         {
-            float tile = name switch { "Sand" => 12f, "Gravel" => 5f, "CrackedSoil" => 10f, "RedRock" => 16f, _ => 8f };
+            // Layers only carry the physics surface weights; the desert shader does the rendering.
+            string tex = name switch { "Gravel" => "Pavement", "CrackedSoil" => "Mud", "RedRock" => "Sandstone", _ => "Sand" };
+            float tile = 8f;
             var layer = new TerrainLayer
             {
-                diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{name}_albedo.png"),
-                normalMapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{name}_normal.png"),
+                diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{tex}_albedo.png"),
+                normalMapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{tex}_normal.png"),
                 tileSize = new Vector2(tile, tile),
                 normalScale = 1f,
                 metallic = 0f,
@@ -224,9 +270,27 @@ namespace Offroad.EditorTools
             var groups = new Dictionary<string, Transform>();
             var td = terrain.terrainData;
 
+            // Instanced scenery: grass, shrubs, small rocks and yuccas.
+            var scatterGo = new GameObject("Instanced Scenery");
+            var inst = scatterGo.AddComponent<InstancedScatter>();
+            var data = new Dictionary<string, List<float>>();
+            int gameObjects = 0;
+
             foreach (var p in scatter.props)
             {
                 string key = $"{p.kind}_{p.variant}";
+                var pos = new Vector3(p.x, 0f, p.z);
+                pos.y = terrain.SampleHeight(pos) + terrain.transform.position.y - p.sink * p.scale;
+                Vector3 n = td.GetInterpolatedNormal(p.x / td.size.x, p.z / td.size.z);
+
+                if (Instanced.TryGetValue(p.kind, out var spec))
+                {
+                    var up = Vector3.Slerp(Vector3.up, n, spec.align).normalized;
+                    if (!data.TryGetValue(key, out var list)) data[key] = list = new List<float>();
+                    list.AddRange(new[] { pos.x, pos.y, pos.z, p.yaw, p.scale, up.x, up.z });
+                    continue;
+                }
+
                 if (!prefabs.TryGetValue(key, out var prefab))
                 {
                     prefab = CreatePropPrefab(model, key, Kinds.TryGetValue(p.kind, out var k) ? k : Kinds["Rock"]);
@@ -239,18 +303,144 @@ namespace Offroad.EditorTools
                     group.SetParent(root, false);
                     groups[p.kind] = group;
                 }
-
                 var kind = Kinds.TryGetValue(p.kind, out var kk) ? kk : Kinds["Rock"];
-                var pos = new Vector3(p.x, 0f, p.z);
-                pos.y = terrain.SampleHeight(pos) + terrain.transform.position.y - p.sink * p.scale;
-                Vector3 n = td.GetInterpolatedNormal(p.x / td.size.x, p.z / td.size.z);
                 Quaternion tilt = Quaternion.FromToRotation(Vector3.up, Vector3.Slerp(Vector3.up, n, kind.alignToGround));
-
-                var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab, group);
-                inst.transform.SetPositionAndRotation(pos, tilt * Quaternion.Euler(0f, p.yaw, 0f));
-                inst.transform.localScale = Vector3.one * p.scale;
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, group);
+                go.transform.SetPositionAndRotation(pos, tilt * Quaternion.Euler(0f, p.yaw, 0f));
+                go.transform.localScale = Vector3.one * p.scale;
+                gameObjects++;
             }
-            Debug.Log($"[Offroad] Placed {scatter.props.Length} props");
+
+            foreach (var kv in data)
+            {
+                var src = model.transform.Find(kv.Key);
+                if (src == null) { Debug.LogWarning($"[Offroad] Prop mesh {kv.Key} not found"); continue; }
+                var spec = Instanced[kv.Key.Split('_')[0]];
+                inst.prototypes.Add(new InstancePrototype
+                {
+                    name = kv.Key,
+                    mesh = src.GetComponent<MeshFilter>().sharedMesh,
+                    materials = MaterialLibrary.Remap(src.GetComponent<MeshRenderer>().sharedMaterials),
+                    castShadows = spec.shadows,
+                    drawDistance = spec.distance,
+                    data = kv.Value.ToArray(),
+                });
+            }
+            Debug.Log($"[Offroad] Placed {gameObjects} prop objects and {inst.TotalInstances} instanced pieces");
+        }
+
+        // ------------------------------------------------------------------ formations
+
+        static void PlaceFormations(Terrain terrain, RegionInfo info)
+        {
+            if (info.formations == null) return;
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(FormationsModel);
+            if (model == null) throw new Exception("Formations model missing: " + FormationsModel);
+            var prefabs = new Dictionary<string, GameObject>();
+            var root = new GameObject("Formations").transform;
+            foreach (var f in info.formations)
+            {
+                if (!prefabs.TryGetValue(f.model, out var prefab))
+                {
+                    prefab = CreateFormationPrefab(model, f.model);
+                    prefabs[f.model] = prefab;
+                }
+                if (prefab == null) continue;
+                var pos = new Vector3(f.x, 0f, f.z);
+                pos.y = terrain.SampleHeight(pos) + terrain.transform.position.y - f.sink * f.scale;
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root);
+                go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, f.yaw, 0f));
+                go.transform.localScale = Vector3.one * f.scale;
+            }
+            Debug.Log($"[Offroad] Placed {info.formations.Length} rock formations");
+        }
+
+        static GameObject CreateFormationPrefab(GameObject model, string name)
+        {
+            var lod0 = model.transform.Find(name);
+            var lod1 = model.transform.Find(name + "_LOD1");
+            if (lod0 == null) { Debug.LogWarning($"[Offroad] Formation {name} not found"); return null; }
+            var go = new GameObject(name);
+            var r0 = AddChildMesh(go, lod0, "LOD0", true);
+            var renderers = new List<LOD> { new LOD(0.18f, new Renderer[] { r0 }) };
+            if (lod1 != null)
+            {
+                var r1 = AddChildMesh(go, lod1, "LOD1", true);
+                renderers.Add(new LOD(0.0008f, new Renderer[] { r1 }));
+                go.AddComponent<MeshCollider>().sharedMesh = lod1.GetComponent<MeshFilter>().sharedMesh;
+            }
+            else go.AddComponent<MeshCollider>().sharedMesh = lod0.GetComponent<MeshFilter>().sharedMesh;
+            var lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(renderers.ToArray());
+            lod.fadeMode = LODFadeMode.None;
+            Directory.CreateDirectory($"{PrefabDir}/Formations");
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Formations/{name}.prefab");
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        static Renderer AddChildMesh(GameObject parent, Transform src, string name, bool shadows)
+        {
+            var child = new GameObject(name);
+            child.transform.SetParent(parent.transform, false);
+            child.AddComponent<MeshFilter>().sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+            var mr = child.AddComponent<MeshRenderer>();
+            mr.sharedMaterials = MaterialLibrary.Remap(src.GetComponent<MeshRenderer>().sharedMaterials);
+            mr.shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            return mr;
+        }
+
+        // ------------------------------------------------------------------ road
+
+        /// <summary>Asphalt ribbon following the highway path, draped on the (flattened) terrain.</summary>
+        static void CreateRoad(Terrain terrain, RegionInfo info)
+        {
+            if (info.roadX == null || info.roadX.Length < 2) return;
+            const float halfWidth = 4f;
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            float dist = 0f;
+            int n = info.roadX.Length;
+            for (int i = 0; i < n; i++)
+            {
+                var p = new Vector3(info.roadX[i], 0f, info.roadZ[i]);
+                var prev = new Vector3(info.roadX[Mathf.Max(i - 1, 0)], 0f, info.roadZ[Mathf.Max(i - 1, 0)]);
+                var next = new Vector3(info.roadX[Mathf.Min(i + 1, n - 1)], 0f, info.roadZ[Mathf.Min(i + 1, n - 1)]);
+                var dir = (next - prev).normalized;
+                var right = new Vector3(dir.z, 0f, -dir.x);
+                if (i > 0) dist += Vector3.Distance(p, prev);
+                for (int s = 0; s <= 4; s++)
+                {
+                    float u = s / 4f;
+                    var q = p + right * Mathf.Lerp(-halfWidth, halfWidth, u);
+                    q.y = terrain.SampleHeight(q) + terrain.transform.position.y + 0.05f;
+                    verts.Add(q);
+                    uvs.Add(new Vector2(u, dist / 16f));
+                }
+                if (i == 0) continue;
+                int a = (i - 1) * 5, b = i * 5;
+                for (int s = 0; s < 4; s++)
+                {
+                    tris.Add(a + s); tris.Add(b + s); tris.Add(b + s + 1);
+                    tris.Add(a + s); tris.Add(b + s + 1); tris.Add(a + s + 1);
+                }
+            }
+            var mesh = new Mesh { name = "Highway", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
+            var path = $"{GeneratedDir}/Highway.asset";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(mesh, path);
+            var go = new GameObject("Highway");
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = MaterialLibrary.Road();
+            mr.shadowCastingMode = ShadowCastingMode.Off;
         }
 
         static GameObject CreatePropPrefab(GameObject model, string name, PropKind kind)

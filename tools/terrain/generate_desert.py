@@ -1,14 +1,25 @@
-"""Generate the desert test region: heightmap, splat map, ground textures and prop scatter.
+"""Fire Canyon: the desert region, designed around its rock formations.
 
 Run:  python tools/terrain/generate_desert.py
 Needs numpy, scipy, pillow.
 
-Outputs (Unity ignores folders ending in "~", the editor setup reads them directly):
-  Assets/Terrain/Source~/desert_height.r16   1025x1025 uint16 little-endian, row 0 = south (z=0)
-  Assets/Terrain/Source~/desert_splat.png    RGBA weights: R sand, G gravel, B cracked soil, A rock
-  Assets/Terrain/Source~/desert_scatter.json props to place (x, z in metres; Unity samples the height)
-  Assets/Terrain/Source~/desert_info.json    size, height, spawn point
-  Assets/Terrain/Textures/*.png              tileable albedo + normal maps
+Layout (x east, z north, metres):
+  * An old two-lane highway winds north through a valley lined with sandstone formations,
+    leaving the region through gaps cut in the cliffs at both ends. Base camp sits beside it.
+  * A dry wash runs from the western cliffs across the valley and drains into a playa (dry lake)
+    of cracked mud in the east. Prospector's Well sits on the playa's western shore.
+  * West: "The Wave", a basin of undulating striped slickrock ringed by spires.
+  * South-west: "The Chimneys" hoodoo field around Balanced Rock.
+  * South-east: dunes, with the Rustbucket half-buried among them.
+  * North-east: mesa country with a big butte, a fin and the Needle's Eye arch.
+  * The edges rise into layered sandstone cliffs.
+
+Outputs (Unity ignores folders ending in "~"; the editor builder reads them):
+  Assets/Terrain/Source~/desert_height.r16    1025^2 uint16 heights (row 0 = south)
+  Assets/Terrain/Source~/desert_splat.png     physics surfaces: R sand, G gravel, B packed mud, A rock
+  Assets/Terrain/Source~/desert_scatter.json  props to place
+  Assets/Terrain/Source~/desert_info.json     size, spawn, road, landmarks, formations, markers
+  Assets/Terrain/Masks/desert_mask.png        render mask: R sand, G mud, B pavement, A slickrock
 """
 import json
 import math
@@ -21,19 +32,20 @@ from scipy.spatial import cKDTree
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(REPO, "Assets", "Terrain", "Source~")
-TEX = os.path.join(REPO, "Assets", "Terrain", "Textures")
+MASKS = os.path.join(REPO, "Assets", "Terrain", "Masks")
 os.makedirs(SRC, exist_ok=True)
-os.makedirs(TEX, exist_ok=True)
+os.makedirs(MASKS, exist_ok=True)
 
-N = 1025            # heightmap samples per side
-SIZE = 1024.0       # metres
-HEIGHT = 160.0      # metres represented by uint16 max
-SEED = 7
+N = 1025
+SIZE = 1024.0
+HEIGHT = 200.0
+CELL = SIZE / (N - 1)
+SEED = 11
 rng = np.random.default_rng(SEED)
+zs, xs = np.mgrid[0:N, 0:N].astype(np.float64) * CELL   # row = z, col = x
 
-ys, xs = np.mgrid[0:N, 0:N].astype(np.float64) * (SIZE / (N - 1))   # metres; row = z, col = x
-cx = cz = SIZE / 2
 
+# ---------------------------------------------------------------------------- helpers
 
 def smoothstep(e0, e1, x):
     t = np.clip((x - e0) / (e1 - e0), 0, 1)
@@ -41,13 +53,10 @@ def smoothstep(e0, e1, x):
 
 
 def value_noise(freq, seed):
-    """Smooth noise in [0,1] with `freq` cells across the map (bicubic upsampled lattice)."""
     r = np.random.default_rng(seed)
     cells = int(freq) + 4
-    grid = r.random((cells, cells))
-    zoom = (N - 1) / freq
-    big = ndimage.zoom(grid, zoom, order=3, mode="reflect")
-    off = int(zoom)
+    big = ndimage.zoom(r.random((cells, cells)), (N - 1) / freq, order=3, mode="reflect")
+    off = int((N - 1) / freq)
     return np.clip(big[off:off + N, off:off + N], 0, 1)
 
 
@@ -60,74 +69,43 @@ def fbm(freq, octaves, seed, gain=0.5):
     return total / norm
 
 
-def ridged(freq, octaves, seed):
-    return 1.0 - np.abs(fbm(freq, octaves, seed) * 2 - 1)
-
-
-# ------------------------------------------------------------------------- heightmap
-print("Building heightmap...")
-dist_spawn = np.hypot(xs - cx, ys - cz)
-spawn_mask = smoothstep(70, 170, dist_spawn)                 # 0 near spawn, 1 away
-
-base = 18.0 + 10.0 * fbm(3, 5, SEED)                         # gentle basin floor
-hills = 14.0 * (fbm(5, 4, SEED + 1) - 0.5) * spawn_mask       # rolling hills
-
-# Winding dry wash (the main trail) crossing the map and passing near spawn.
-t = np.linspace(0, 1, 4000)
-path_x = SIZE * (0.5 + 0.18 * np.sin(2 * math.pi * t * 1.15 + 0.4) + 0.06 * np.sin(2 * math.pi * t * 3.3))
-path_z = SIZE * (0.06 + 0.88 * t)
-tree = cKDTree(np.c_[path_x, path_z])
-d_wash, _ = tree.query(np.c_[xs.ravel(), ys.ravel()])
-d_wash = d_wash.reshape(N, N)
-wash = -6.0 * (1.0 - smoothstep(9.0, 38.0, d_wash)) - 2.5 * np.exp(-(d_wash / 70.0) ** 2)   # flat floor, soft banks
-keep_clear = smoothstep(18, 55, d_wash) * spawn_mask           # mesas stay off the trail and spawn
-
-
 def norm01(a):
     lo, hi = np.percentile(a, 1), np.percentile(a, 99)
     return np.clip((a - lo) / (hi - lo), 0, 1)
 
 
-# Mesas / buttes: flat tops, two tiers, steep terraced sides.
-m = norm01(fbm(3.0, 4, SEED + 4) + 0.25 * fbm(9, 2, SEED + 11))
-plateau = smoothstep(0.70, 0.74, m) * keep_clear
-tier2 = smoothstep(0.84, 0.865, m) * keep_clear
-mesas = 32.0 * plateau + 20.0 * tier2
+def catmull(points, samples):
+    p = np.array(points, float)
+    p = np.vstack([p[0] * 2 - p[1], p, p[-1] * 2 - p[-2]])
+    out = []
+    per = max(2, samples // (len(p) - 3))
+    for i in range(1, len(p) - 2):
+        p0, p1, p2, p3 = p[i - 1], p[i], p[i + 1], p[i + 2]
+        for t in np.linspace(0, 1, per, endpoint=False):
+            t2, t3 = t * t, t * t * t
+            out.append(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    out.append(p[-2])
+    return np.array(out)
 
-# Dune field in the south-east quarter.
-dmask = smoothstep(0.35, 0.0, np.hypot(xs / SIZE - 0.78, ys / SIZE - 0.25)) * spawn_mask
-dunes = (1.5 + 7.0 * dmask) * (0.5 + 0.5 * np.sin((xs * 0.8 + ys * 0.6) / (10.0 + 14 * dmask)
-                                                  + 5.0 * fbm(6, 3, SEED + 2))) * fbm(4, 2, SEED + 3) * keep_clear
 
-# Sparse crawling outcrops (ridged fins) in a rocky band west of the trail.
-rmask = smoothstep(0.30, 0.05, np.abs(xs / SIZE - 0.22)) * keep_clear
-fins = 6.0 * smoothstep(0.86, 0.97, ridged(7, 3, SEED + 5)) * rmask
+def path_field(path):
+    tree = cKDTree(path)
+    d, i = tree.query(np.c_[xs.ravel(), zs.ravel()])
+    return d.reshape(N, N), i.reshape(N, N), tree
 
-# Boundary: rising ridges keep the player inside without invisible walls.
-edge = np.maximum(np.abs(xs - cx), np.abs(ys - cz)) / (SIZE / 2)
-border = 90.0 * smoothstep(0.82, 0.985, edge + 0.08 * (fbm(5, 3, SEED + 6) - 0.5)) * (0.7 + 0.6 * fbm(4, 3, SEED + 7))
 
-h = base + hills + dunes + mesas + fins + wash + border
-
-# Thermal erosion: soften slopes steeper than the talus angle, keep cliffs sharp-ish.
-print("Eroding...")
-talus = 1.25  # metres per metre (~51 degrees)
-for _ in range(40):
-    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        nb = np.roll(np.roll(h, dx, axis=1), dz, axis=0)
-        diff = h - nb
-        move = np.where(diff > talus, (diff - talus) * 0.25, 0.0)
-        h = h - move + np.roll(np.roll(move, -dx, axis=1), -dz, axis=0)
-h = ndimage.gaussian_filter(h, 0.7)
-h = np.clip(h, 0.5, HEIGHT - 1)
-
-# ------------------------------------------------------------------------- landmarks
-print("Placing landmarks...")
-CELL = SIZE / (N - 1)
+def ellipse_r(cx, cz, rx, rz, yaw_deg=0.0, x=None, z=None):
+    x = xs if x is None else x
+    z = zs if z is None else z
+    a = math.radians(yaw_deg)
+    dx, dz = x - cx, z - cz
+    u = dx * math.cos(a) - dz * math.sin(a)
+    v = dx * math.sin(a) + dz * math.cos(a)
+    return np.sqrt((u / rx) ** 2 + (v / rz) ** 2)
 
 
 def idx(x, z):
-    return (int(np.clip(round(z / CELL), 0, N - 1)), int(np.clip(round(x / CELL), 0, N - 1)))
+    return int(np.clip(round(z / CELL), 0, N - 1)), int(np.clip(round(x / CELL), 0, N - 1))
 
 
 def sample(arr, x, z):
@@ -135,72 +113,222 @@ def sample(arr, x, z):
 
 
 def slope_map(hh):
-    gz_, gx_ = np.gradient(hh, CELL)
-    return np.degrees(np.arctan(np.hypot(gx_, gz_)))
+    gz, gx = np.gradient(hh, CELL)
+    return np.degrees(np.arctan(np.hypot(gx, gz)))
 
 
-slope = slope_map(h)
+# ---------------------------------------------------------------------------- paths and zones
 
-# Spawn on the wash near the centre, facing along it.
-i0 = int(np.argmin(np.hypot(path_x - cx, path_z - cz)))
-spawn_x, spawn_z = float(path_x[i0]), float(path_z[i0])
-j = min(i0 + 25, len(t) - 1)
-heading = math.degrees(math.atan2(path_x[j] - spawn_x, path_z[j] - spawn_z))
-fwd = np.array([math.sin(math.radians(heading)), math.cos(math.radians(heading))])
-right = np.array([fwd[1], -fwd[0]])
+ROAD = [(566, -30), (574, 90), (556, 190), (528, 300), (532, 420), (508, 540), (474, 660), (480, 780),
+        (458, 900), (452, 1060)]
+WASH = [(-20, 330), (80, 352), (170, 322), (280, 372), (390, 352), (520, 392), (610, 440), (690, 500), (760, 560)]
+road = catmull(ROAD, 4000)
+wash = catmull(WASH, 4000)
+d_road, i_road, road_tree = path_field(road)
+d_wash, i_wash, _ = path_field(wash)
 
+WAVE = (215, 575, 125, 100)        # cx, cz, rx, rz
+PLAYA = (785, 600, 150, 108)
+DUNES = (815, 235, 185, 150)
+CHIMNEYS = (205, 205)
+
+
+def road_point(t, side=0.0):
+    """Point at fraction t along the road, offset `side` metres to its right (east-ish)."""
+    k = int(np.clip(t, 0, 1) * (len(road) - 1))
+    k2 = min(k + 1, len(road) - 1)
+    tx, tz = road[k2] - road[max(k - 1, 0)]
+    ln = math.hypot(tx, tz) or 1
+    rx, rz = tz / ln, -tx / ln
+    return float(road[k][0] + rx * side), float(road[k][1] + rz * side), math.degrees(math.atan2(tx, tz))
+
+
+# ---------------------------------------------------------------------------- formations (placed first, terrain adapts)
+# name: (rx, rz) footprint half-extents in metres at scale 1, along the model's local x and z
+FOOT = {"Mound_0": (23, 19), "Mound_1": (15, 13), "Mound_2": (28, 19), "Fin_0": (35, 8), "Fin_1": (23, 8),
+        "Butte_0": (50, 40), "Spire_0": (7, 7), "Spire_1": (5, 5), "Ledge_0": (8, 6), "Ledge_1": (6, 4),
+        "Ledge_2": (11, 5), "Arch_0": (21, 6)}
+
+formations = []
+
+
+def add_formation(model, x, z, yaw, scale, sink=2.5):
+    formations.append({"model": model, "x": round(x, 2), "z": round(z, 2), "yaw": round(yaw % 360, 1),
+                       "scale": round(scale, 2), "sink": sink})
+
+
+def beside_road(model, t, side, yaw_off, scale, sink=2.5):
+    x, z, heading = road_point(t, side)
+    add_formation(model, x, z, heading + yaw_off, scale, sink)
+
+
+def massif(t, side, length, count, scale_rng, seed, models=("Mound_0", "Mound_2", "Fin_0", "Mound_1", "Fin_1")):
+    """A long rock mass built from overlapping formations, running roughly parallel to the road."""
+    r = np.random.default_rng(seed)
+    cx, cz, heading = road_point(t, side)
+    a = math.radians(heading + r.uniform(-25, 25))
+    along = (math.sin(a), math.cos(a))
+    for k in range(count):
+        u = (k / max(count - 1, 1) - 0.5) * length + r.uniform(-8, 8)
+        out = r.uniform(-14, 22) * (1 if side > 0 else -1)
+        x = cx + along[0] * u + along[1] * out
+        z = cz + along[1] * u - along[0] * out
+        m = models[int(r.integers(len(models)))]
+        add_formation(m, x, z, heading + r.uniform(-40, 40) + (90 if m.startswith("Fin") else r.uniform(0, 360)),
+                      r.uniform(*scale_rng), 3.5)
+
+
+# The valley: long rock masses on both sides of the highway with gaps between them, plus
+# single giant "gateway" formations that pinch in close to the road (as in the reference photo).
+massif(0.05, -118, 170, 4, (1.6, 2.3), 1)
+massif(0.10, 120, 150, 4, (1.6, 2.4), 2)
+massif(0.36, -125, 200, 5, (1.8, 2.6), 3)
+massif(0.33, 128, 170, 4, (1.7, 2.5), 4)
+massif(0.56, -122, 180, 5, (1.7, 2.6), 5)
+massif(0.60, 130, 200, 5, (1.8, 2.8), 6)
+massif(0.80, -118, 190, 4, (1.8, 2.6), 7)
+massif(0.84, 125, 170, 4, (1.7, 2.5), 8)
+beside_road("Mound_0", 0.255, 58, 30, 1.7, 3.0)          # gateway pair framing the first view
+beside_road("Fin_1", 0.275, -62, 80, 2.0, 3.0)
+beside_road("Mound_1", 0.15, 55, 200, 1.6, 3.0)
+beside_road("Mound_2", 0.45, -66, 200, 1.7, 3.0)
+beside_road("Spire_0", 0.49, 50, 0, 1.4, 2.5)
+beside_road("Mound_1", 0.66, 62, 110, 2.1, 3.0)
+beside_road("Fin_1", 0.71, -58, 95, 1.8, 3.0)
+beside_road("Spire_1", 0.38, 46, 0, 1.3, 2.5)
+beside_road("Ledge_2", 0.74, 34, 15, 1.4, 1.2)
+beside_road("Ledge_0", 0.92, -40, 60, 1.5, 1.0)
+
+# Base camp area: low ledges and a small mound make the rock garden.
+for i, (t, side, m, s) in enumerate(((0.215, -62, "Ledge_0", 1.1), (0.205, -88, "Ledge_2", 1.0), (0.235, -78, "Ledge_1", 1.3),
+                                     (0.19, -70, "Ledge_1", 0.9), (0.225, -110, "Mound_1", 0.7))):
+    beside_road(m, t, side, i * 47, s, 1.0 if m.startswith("Ledge") else 2.5)
+
+# The Wave: spires and fins around the rim of the slickrock basin.
+for m, a, rad, s in (("Spire_0", 110, 1.05, 1.5), ("Spire_1", 70, 1.1, 1.4), ("Spire_1", 200, 1.08, 1.2),
+                     ("Fin_1", 160, 1.25, 1.6), ("Ledge_2", 300, 0.95, 1.3), ("Ledge_0", 20, 1.0, 1.4),
+                     ("Mound_1", 245, 1.22, 1.7), ("Mound_0", 135, 1.45, 1.8), ("Fin_0", 215, 1.5, 1.6)):
+    ax = WAVE[0] + math.cos(math.radians(a)) * WAVE[2] * rad
+    az = WAVE[1] + math.sin(math.radians(a)) * WAVE[3] * rad
+    add_formation(m, ax, az, a + 90, s, 2.0 if m.startswith("Ledge") else 2.5)
+
+# The Chimneys: spires and a mound among the hoodoos.
+add_formation("Mound_1", 130, 140, 30, 1.8, 3.0)
+add_formation("Mound_2", 90, 260, 70, 1.6, 3.0)
+add_formation("Spire_0", 270, 260, 0, 1.1)
+add_formation("Spire_1", 165, 290, 40, 1.2)
+add_formation("Spire_1", 255, 150, 110, 1.0)
+
+# Mesa country: a butte, a fin and the arch, its window turned toward the road.
+add_formation("Butte_0", 850, 885, 15, 1.4, 4.0)
+add_formation("Fin_0", 715, 735, 30, 1.5, 3.0)
+add_formation("Mound_2", 610, 930, 80, 1.8, 3.0)
+arch_x, arch_z = 690.0, 850.0
+add_formation("Arch_0", arch_x, arch_z, math.degrees(math.atan2(arch_x - 480, arch_z - 780)) + 90, 1.4, 2.5)
+
+# Playa shore and dunes: low ledges only, keeping the flats open.
+add_formation("Ledge_1", 672, 650, 40, 1.2, 1.2)
+add_formation("Ledge_0", 900, 520, 120, 1.1, 1.2)
+add_formation("Mound_1", 930, 720, 80, 2.0, 3.0)
+add_formation("Mound_0", 935, 420, 140, 1.8, 3.0)
+add_formation("Ledge_2", 745, 335, 70, 1.0, 1.8)
+
+
+def footprint_r(f, x=None, z=None):
+    rx, rz = FOOT[f["model"]]
+    return ellipse_r(f["x"], f["z"], rx * f["scale"], rz * f["scale"], -f["yaw"], x, z)
+
+
+# Push formations clear of the road if a footprint overlaps it.
+for f in formations:
+    for _ in range(40):
+        need = max(FOOT[f["model"]]) * f["scale"] * 0.75 + 12
+        if sample(d_road, f["x"], f["z"]) >= need:
+            break
+        _, k = road_tree.query([f["x"], f["z"]])
+        dx, dz = f["x"] - road[k][0], f["z"] - road[k][1]
+        ln = math.hypot(dx, dz) or 1
+        f["x"] += dx / ln * 3
+        f["z"] += dz / ln * 3
+
+foot_r = np.full((N, N), 9.0)       # < 1 inside a formation footprint
+for f in formations:
+    foot_r = np.minimum(foot_r, footprint_r(f))
+
+
+# ---------------------------------------------------------------------------- heightmap
+print("Building heightmap...")
+base = 24 + 4 * (fbm(3, 4, SEED) - 0.5) + 2 * (fbm(9, 3, SEED + 1) - 0.5)
+valley = -7 * np.exp(-(d_road / 150) ** 2)
+hills = 10 * (fbm(5, 4, SEED + 2) - 0.5) * smoothstep(45, 140, d_road)
+h = base + valley + hills
+
+rW = ellipse_r(*WAVE)
+wW = smoothstep(1.18, 0.82, rW)
+swirl = (4.5 * np.sin(xs / 19 + 1.4 * np.sin(zs / 35)) * np.cos(zs / 24 + 1.2 * np.sin(xs / 29))
+         + 2.5 * (fbm(8, 3, SEED + 3) - 0.5))
+h = h * (1 - wW) + (17 + swirl) * wW
+
+rP = ellipse_r(*PLAYA, yaw_deg=-15)
+wP = smoothstep(1.22, 0.92, rP)
+h = h * (1 - wP) + (14.0 + 0.25 * (fbm(20, 2, SEED + 4) - 0.5)) * wP
+
+rD = ellipse_r(*DUNES)
+wD = smoothstep(1.1, 0.55, rD)
+ph = (xs * 0.75 + zs * 0.66) / 26 + 3 * fbm(5, 2, SEED + 5)
+saw = ph - np.floor(ph)
+dune = np.where(saw < 0.75, saw / 0.75, (1 - saw) / 0.25)
+h += wD * 8.0 * dune ** 1.4 * (0.5 + fbm(4, 2, SEED + 6))
+
+ramp = (xs / SIZE + zs / SIZE - 1.25) * 1.5
+mv = norm01(fbm(2.5, 3, SEED + 7)) * 0.6 + ramp
+keep = smoothstep(70, 130, d_road) * (1 - wP)
+plat = smoothstep(0.55, 0.58, mv) * keep
+tier2 = smoothstep(0.82, 0.85, mv) * keep
+h = np.maximum(h, h * (1 - plat) + (54 + 2 * fbm(6, 2, SEED + 8)) * plat)
+h = h + 18 * tier2
+
+edge = np.maximum(np.abs(xs - SIZE / 2), np.abs(zs - SIZE / 2)) / (SIZE / 2)
+edge = edge + 0.07 * (fbm(5, 3, SEED + 9) - 0.5)
+gap = smoothstep(30, 70, d_road)
+skyline = 0.6 + 0.8 * fbm(7, 4, SEED + 10)
+wall = (34 * smoothstep(0.84, 0.88, edge) + 40 * smoothstep(0.92, 0.96, edge) * skyline) * (0.6 + 0.7 * fbm(3, 3, SEED + 12))
+h = h + wall * gap
+
+h += 2.5 * smoothstep(1.6, 0.8, foot_r)          # each formation sits on a gentle apron
+
+print("Eroding...")
+talus = 1.3
+for _ in range(25):
+    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nb = np.roll(np.roll(h, dx, axis=1), dz, axis=0)
+        diff = h - nb
+        move = np.where(diff > talus, (diff - talus) * 0.25, 0.0)
+        h = h - move + np.roll(np.roll(move, -dx, axis=1), -dz, axis=0)
+h = ndimage.gaussian_filter(h, 0.6)
+
+carve = (1 - smoothstep(8, 26, d_wash)) * (1 - wP)
+h -= 3.5 * carve
+
+road_h = np.array([sample(h, x, z) for x, z in road])
+road_h = ndimage.gaussian_filter1d(road_h, 60, mode="nearest")
+road_w = 1 - smoothstep(6.5, 20, d_road)
+h = h * (1 - road_w) + road_h[i_road] * road_w
+
+
+# ---------------------------------------------------------------------------- landmarks and spawn
+print("Placing landmarks...")
 landmarks = []
 
 
-def flatten(x, z, radius, strength=1.0):
-    """Blend the ground toward its average height inside a radius (building pads, camp)."""
-    global h
-    d = np.hypot(xs - x, ys - z)
-    inner = d < radius * 0.5
-    target = h[inner].mean()
-    w = smoothstep(radius, radius * 0.55, d) * strength
-    h = h * (1 - w) + target * w
-
-
-def find_site(dist, bearing, spread=50, max_slope=9, min_wash=45, min_sep=150, radius=20):
-    best, best_score = None, 1e9
-    for r_ in np.arange(dist - 70, dist + 71, 10):
-        for b in np.arange(bearing - spread, bearing + spread + 1, 5):
-            x = spawn_x + math.sin(math.radians(b)) * r_
-            z = spawn_z + math.cos(math.radians(b)) * r_
-            if not (110 < x < SIZE - 110 and 110 < z < SIZE - 110):
-                continue
-            if sample(d_wash, x, z) < min_wash:
-                continue
-            if any(math.hypot(x - L["x"], z - L["z"]) < min_sep for L in landmarks):
-                continue
-            ring = [sample(slope, x + math.cos(a) * radius * f, z + math.sin(a) * radius * f)
-                    for a in np.linspace(0, 2 * math.pi, 8, endpoint=False) for f in (0.4, 1.0)]
-            ms = float(np.mean(ring))
-            if ms > max_slope:
-                continue
-            score = ms + abs(r_ - dist) * 0.03 + abs(b - bearing) * 0.02
-            if score < best_score:
-                best, best_score = (float(x), float(z)), score
-    if best is None:
-        raise SystemExit(f"No site found near {dist} m / {bearing} deg")
-    return best
-
-
-def facing(x, z, tx, tz):
-    return math.degrees(math.atan2(tx - x, tz - z))
-
-
 def piece(model, x, z, yaw, sink=0.0, align=0.0, local=None):
-    """local=(ox, oz, landmark_x, landmark_z, landmark_yaw) places relative to a landmark."""
     if local:
         ox, oz, lx, lz, lyaw = local
         a = math.radians(lyaw)
         x = lx + ox * math.cos(a) + oz * math.sin(a)
         z = lz - ox * math.sin(a) + oz * math.cos(a)
         yaw = yaw + lyaw
-    return {"model": model, "x": round(x, 2), "z": round(z, 2), "yaw": round(yaw % 360, 1),
-            "sink": sink, "align": align}
+    return {"model": model, "x": round(x, 2), "z": round(z, 2), "yaw": round(yaw % 360, 1), "sink": sink, "align": align}
 
 
 def landmark(lid, name, x, z, radius, pieces, discover_radius=None):
@@ -208,99 +336,109 @@ def landmark(lid, name, x, z, radius, pieces, discover_radius=None):
                       "discoverRadius": discover_radius or radius * 2.2, "pieces": pieces})
 
 
-# Base camp on the bank beside the spawn point.
-camp_x, camp_z = (np.array([spawn_x, spawn_z]) + right * 24).tolist()
+def flatten(x, z, radius, strength=1.0):
+    global h
+    d = np.hypot(xs - x, zs - z)
+    target = h[d < radius * 0.5].mean()
+    w = smoothstep(radius, radius * 0.55, d) * strength
+    h = h * (1 - w) + target * w
+
+
+spawn_x, spawn_z, spawn_heading = road_point(0.205, 0)
+camp_x, camp_z, _ = road_point(0.205, 30)
 flatten(camp_x, camp_z, 18)
-cy = facing(camp_x, camp_z, spawn_x, spawn_z)
+cy = math.degrees(math.atan2(spawn_x - camp_x, spawn_z - camp_z))
 landmark("basecamp", "Base Camp", camp_x, camp_z, 14, [
     piece("Tent", 0, 0, 0, 0.02, local=(0, -2, camp_x, camp_z, cy + 180)),
     piece("FireRing", 0, 0, 0, 0.05, local=(-3.5, 2.5, camp_x, camp_z, cy + 180)),
     piece("Crates", 0, 0, 30, 0.0, local=(3.2, 0.5, camp_x, camp_z, cy + 180)),
-    piece("Signpost", 0, 0, 10, 0.1, local=(-1.0, -9.0, camp_x, camp_z, cy + 180)),
+    piece("Signpost", 0, 0, 10, 0.1, local=(-1.0, -11.0, camp_x, camp_z, cy + 180)),
 ], discover_radius=1)
 
-# The Needle's Eye: a big natural arch you can drive through, framed from the trail.
-ax, az = find_site(300, (heading + 50) % 360, radius=26, max_slope=10)
-flatten(ax, az, 30, 0.6)
-landmark("needles_eye", "The Needle's Eye", ax, az, 24, [
-    piece("NeedlesEye", ax, az, facing(ax, az, spawn_x, spawn_z) + 90, 0.6, 0.0)])
+rg_x, rg_z, _ = road_point(0.215, -82)
+landmark("rock_garden", "The Rock Garden", rg_x, rg_z, 34, [], discover_radius=42)
+landmark("needles_eye", "The Needle's Eye", arch_x, arch_z, 24, [], discover_radius=55)
 
-# Prospector's Well: windmill, tank and shack beside the wash, with an oasis.
-wx, wz = find_site(330, (heading + 190) % 360, min_wash=28, radius=24, max_slope=8)
-flatten(wx, wz, 26)
-wy = facing(wx, wz, spawn_x, spawn_z)
-landmark("prospectors_well", "Prospector's Well", wx, wz, 22, [
-    piece("Windmill", 0, 0, 0, 0.1, local=(0, 0, wx, wz, wy)),
-    piece("WaterTank", 0, 0, 0, 0.05, local=(5.5, -1.5, wx, wz, wy)),
-    piece("Shack", 0, 0, 90, 0.05, local=(-10, 5, wx, wz, wy)),
-    piece("Crates", 0, 0, -20, 0.0, local=(-6.5, -2.0, wx, wz, wy)),
+well_x, well_z = 642.0, 468.0
+flatten(well_x, well_z, 26)
+wy = math.degrees(math.atan2(spawn_x - well_x, spawn_z - well_z))
+landmark("prospectors_well", "Prospector's Well", well_x, well_z, 22, [
+    piece("Windmill", 0, 0, 0, 0.1, local=(0, 0, well_x, well_z, wy)),
+    piece("WaterTank", 0, 0, 0, 0.05, local=(5.5, -1.5, well_x, well_z, wy)),
+    piece("Shack", 0, 0, 90, 0.05, local=(-10, 5, well_x, well_z, wy)),
+    piece("Crates", 0, 0, -20, 0.0, local=(-6.5, -2.0, well_x, well_z, wy)),
 ])
+landmark("chimneys", "The Chimneys", CHIMNEYS[0], CHIMNEYS[1], 60,
+         [piece("BalancedRock", CHIMNEYS[0], CHIMNEYS[1], 35, 0.3, 0.0)], discover_radius=80)
+landmark("the_wave", "The Wave", WAVE[0], WAVE[1], 90, [], discover_radius=95)
+rx_, rz_ = 830.0, 250.0
+landmark("rustbucket", "Rustbucket", rx_, rz_, 8, [piece("Wreck", rx_, rz_, 137, 0.45, 0.7)])
 
-# The Chimneys: a hoodoo field around Balanced Rock.
-hx, hz = find_site(380, (heading + 290) % 360, radius=30, max_slope=12, min_wash=60)
-landmark("chimneys", "The Chimneys", hx, hz, 70, [piece("BalancedRock", hx, hz, 35, 0.3, 0.0)],
-         discover_radius=90)
-
-# Rustbucket: an old pickup half-buried in the dunes.
-best = None
-for _ in range(400):
-    x, z = rng.uniform(0.62, 0.9) * SIZE, rng.uniform(0.12, 0.38) * SIZE
-    if sample(slope, x, z) < 7 and sample(d_wash, x, z) > 60 and all(math.hypot(x - L["x"], z - L["z"]) > 150 for L in landmarks):
-        best = (float(x), float(z))
-        break
-rx, rz = best or (SIZE * 0.75, SIZE * 0.25)
-landmark("rustbucket", "Rustbucket", rx, rz, 8, [piece("Wreck", rx, rz, float(rng.uniform(0, 360)), 0.4, 0.7)])
-
-# Rock garden: a crawling playground near camp.
-gx_, gz_ = find_site(150, (heading + 300) % 360, radius=30, max_slope=11, min_wash=35, min_sep=110)
-landmark("rock_garden", "The Rock Garden", gx_, gz_, 32, [], discover_radius=40)
-
-# Re-smooth after pads, then write the heightmap.
-h = np.clip(h, 0.5, HEIGHT - 1)
-spawn_h = float(sample(h, spawn_x, spawn_z))
-np.round(h / HEIGHT * 65535).astype("<u2").tofile(os.path.join(SRC, "desert_height.r16"))
-print(f"Height range {h.min():.1f}..{h.max():.1f} m, spawn at {spawn_h:.1f} m")
-for L in landmarks:
-    print(f"  {L['name']:22s} at ({L['x']:.0f}, {L['z']:.0f}), {math.hypot(L['x'] - spawn_x, L['z'] - spawn_z):.0f} m from spawn")
-
-# ------------------------------------------------------------------------- splat map
-print("Painting splat...")
+h = np.clip(h, 1, HEIGHT - 1)
 slope = slope_map(h)
-curv = ndimage.laplace(ndimage.gaussian_filter(h, 2))
-nz = fbm(20, 3, SEED + 8)
+np.round(h / HEIGHT * 65535).astype("<u2").tofile(os.path.join(SRC, "desert_height.r16"))
+print(f"Height range {h.min():.1f}..{h.max():.1f} m")
+for L in landmarks:
+    print(f"  {L['name']:20s} ({L['x']:.0f}, {L['z']:.0f})  {math.hypot(L['x'] - spawn_x, L['z'] - spawn_z):.0f} m from spawn")
 
-rock = smoothstep(30, 42, slope + 8 * (nz - 0.5))
-gravel = smoothstep(10, 22, slope) * (1 - rock) + smoothstep(0.55, 0.75, fbm(14, 3, SEED + 9)) * 0.6
-soil = smoothstep(0.5, 0.7, fbm(9, 4, SEED + 10)) * (1 - rock) * smoothstep(5, 0, slope)
-soil = np.maximum(soil, np.exp(-(d_wash / 14.0) ** 2) * (1 - rock))      # cracked mud in the wash
-for L in landmarks:                                                          # packed dirt around camps and the well
-    if L["id"] in ("basecamp", "prospectors_well"):
-        soil = np.maximum(soil, smoothstep(L["radius"] * 1.3, L["radius"] * 0.5, np.hypot(xs - L["x"], ys - L["z"])))
-sand = np.clip(1.0 - rock - gravel - soil, 0, 1) + np.clip(curv * 2, 0, 0.5) * (1 - rock)  # sand pools in hollows
-w = np.stack([sand, gravel, soil, rock], axis=-1).clip(0, None) + 1e-4
-w = w / w.sum(-1, keepdims=True)
-SPLAT = 512
-splat = ndimage.zoom(w, (SPLAT / N, SPLAT / N, 1), order=1)
+
+# ---------------------------------------------------------------------------- render mask + physics splat
+print("Painting masks...")
+curv = ndimage.laplace(ndimage.gaussian_filter(h, 2.5))
+patch = fbm(10, 4, SEED + 20)
+fine = fbm(28, 3, SEED + 21)
+near_form = smoothstep(2.2, 1.0, foot_r)
+apron = smoothstep(1.35, 1.0, foot_r)
+
+mud = np.maximum(wP, (1 - smoothstep(5, 15, d_wash)) * 0.85 * (1 - wP))
+mud = np.maximum(mud, smoothstep(0.15, 0.35, curv) * smoothstep(0.6, 0.75, patch) * (1 - wD))
+pave = smoothstep(0.55, 0.72, patch) * 0.8 + near_form * 0.7 * smoothstep(0.35, 0.6, fine)
+pave = np.maximum(pave, (smoothstep(4.5, 7.0, d_road) * (1 - smoothstep(9, 14, d_road))) * 0.8)   # road shoulders
+pave *= (1 - wD) * (1 - wP)
+sand = np.clip(1.0 - mud - pave, 0.05, 1) + wD
+rgb = np.stack([sand, mud, pave], -1)
+rgb /= rgb.sum(-1, keepdims=True)
+
+ridged = 1 - np.abs(fbm(9, 3, SEED + 22) * 2 - 1)
+outcrop = smoothstep(0.86, 0.95, ridged) * smoothstep(80, 140, d_road) * (1 - wD) * (1 - wP)
+slick = np.maximum.reduce([wW * smoothstep(0.25, 0.45, fine + 0.25), apron * 0.85,
+                           plat * 0.5 * smoothstep(0.4, 0.6, fine), outcrop])
+slick *= 1 - smoothstep(14, 6, d_road)
+
+M = 1024
+mask = np.concatenate([rgb, slick[..., None]], -1)
+mask_img = ndimage.zoom(mask, (M / N, M / N, 1), order=1)
+Image.fromarray((np.clip(mask_img[::-1], 0, 1) * 255).round().astype(np.uint8), "RGBA").save(os.path.join(MASKS, "desert_mask.png"))
+
+rock_phys = np.maximum(slick, smoothstep(0.24, 0.42, 1 - np.cos(np.radians(slope))))
+phys = np.stack([rgb[..., 0] * (1 - rock_phys), rgb[..., 2] * (1 - rock_phys), rgb[..., 1] * (1 - rock_phys), rock_phys], -1)
+on_road = 1 - smoothstep(4.5, 5.5, d_road)               # asphalt grips like gravel
+phys[..., 0] *= 1 - on_road
+phys[..., 2] *= 1 - on_road
+phys[..., 1] = np.maximum(phys[..., 1], on_road)
+phys = phys / (phys.sum(-1, keepdims=True) + 1e-6)
+S = 512
+splat = ndimage.zoom(phys, (S / N, S / N, 1), order=1)
 splat = splat / splat.sum(-1, keepdims=True)
-# PNG row 0 is the top of the image; store north at top so row index = N-1-z.
 Image.fromarray((splat[::-1] * 255).round().astype(np.uint8), "RGBA").save(os.path.join(SRC, "desert_splat.png"))
 
-# ------------------------------------------------------------------------- scatter (clustered)
-print("Scattering props in clusters...")
+
+# ---------------------------------------------------------------------------- scatter
+print("Scattering...")
 props = []
+pads = [(L["x"], L["z"], L["radius"]) for L in landmarks if L["id"] in ("basecamp", "prospectors_well")]
 
 
 class Spacing:
-    """Grid hash enforcing a minimum distance between solid props."""
     def __init__(self, cell=4.0):
         self.cell, self.grid = cell, {}
 
     def ok(self, x, z, r):
-        cx_, cz_ = int(x // self.cell), int(z // self.cell)
+        cx, cz = int(x // self.cell), int(z // self.cell)
         reach = int(math.ceil(r / self.cell)) + 1
-        for i in range(cx_ - reach, cx_ + reach + 1):
-            for k in range(cz_ - reach, cz_ + reach + 1):
-                for (px, pz, pr) in self.grid.get((i, k), ()):
+        for i in range(cx - reach, cx + reach + 1):
+            for k in range(cz - reach, cz + reach + 1):
+                for px, pz, pr in self.grid.get((i, k), ()):
                     if math.hypot(px - x, pz - z) < max(r, pr):
                         return False
         return True
@@ -312,228 +450,174 @@ class Spacing:
 solid = Spacing()
 
 
-def blocked(x, z, trail=10.0, margin=1.0):
-    if not (15 < x < SIZE - 15 and 15 < z < SIZE - 15):
+def blocked(x, z, road_clear=8.0, wash_clear=5.0):
+    if not (12 < x < SIZE - 12 and 12 < z < SIZE - 12):
         return True
-    if sample(d_wash, x, z) < trail:
+    if sample(d_road, x, z) < road_clear or sample(d_wash, x, z) < wash_clear:
         return True
-    if math.hypot(x - spawn_x, z - spawn_z) < 28:
+    if sample(foot_r, x, z) < 0.92:
         return True
-    return any(math.hypot(x - L["x"], z - L["z"]) < L["radius"] * margin for L in landmarks
-               if L["id"] not in ("chimneys", "rock_garden"))
+    if math.hypot(x - spawn_x, z - spawn_z) < 14:
+        return True
+    return any(math.hypot(x - px, z - pz) < pr for px, pz, pr in pads)
 
 
-def put(kind, variants, x, z, scale, sink, spacing=0.0, trail=10.0):
-    if blocked(x, z, trail):
+def put(kind, variants, x, z, scale, sink, spacing=0.0, road_clear=8.0):
+    if blocked(x, z, road_clear):
+        return False
+    if sample(slope, x, z) > 34 and kind not in ("Boulder", "Rock"):
         return False
     if spacing and not solid.ok(x, z, spacing * scale):
         return False
     if spacing:
         solid.add(x, z, spacing * scale)
-    props.append({"kind": kind, "variant": int(rng.integers(variants)), "x": round(float(x), 2),
-                  "z": round(float(z), 2), "yaw": round(float(rng.uniform(0, 360)), 1),
-                  "scale": round(float(scale), 2), "sink": sink})
+    props.append({"kind": kind, "variant": int(rng.integers(variants)), "x": round(float(x), 2), "z": round(float(z), 2),
+                  "yaw": round(float(rng.uniform(0, 360)), 1), "scale": round(float(scale), 2), "sink": sink})
     return True
 
 
-def cluster(cx_, cz_, radius, items, falloff=0.5):
-    """items: (kind, variants, count, (smin, smax), sink, spacing)"""
-    for kind, variants, count, (s0, s1), sink, spacing in items:
-        placed = tries = 0
-        while placed < count and tries < count * 30:
-            tries += 1
-            r = radius * abs(rng.normal(0, falloff))
-            if r > radius:
-                continue
-            a = rng.uniform(0, 2 * math.pi)
-            x, z = cx_ + math.cos(a) * r, cz_ + math.sin(a) * r
-            if put(kind, variants, x, z, rng.uniform(s0, s1) * (1.15 - 0.3 * r / radius), sink, spacing):
-                placed += 1
+def ring_around(f, inner, outer, count, kind, variants, scale_rng, sink, spacing=0.0, decay=6.0):
+    """Scatter in a band just outside a formation's footprint (talus, grass belts)."""
+    rx, rz = FOOT[f["model"]]
+    rx, rz = rx * f["scale"], rz * f["scale"]
+    a0 = math.radians(f["yaw"])
+    placed = tries = 0
+    while placed < count and tries < count * 25:
+        tries += 1
+        ang = rng.uniform(0, 2 * math.pi)
+        dist = inner + rng.exponential(decay)
+        if dist > outer:
+            continue
+        ex, ez = math.cos(ang) * (rx + dist), math.sin(ang) * (rz + dist)
+        x = f["x"] + ex * math.cos(a0) + ez * math.sin(a0)
+        z = f["z"] - ex * math.sin(a0) + ez * math.cos(a0)
+        sc = rng.uniform(*scale_rng) * (1.25 - 0.5 * min(dist / outer, 1))
+        placed += put(kind, variants, x, z, sc, sink, spacing)
 
 
-L = {l["id"]: l for l in landmarks}
+for f in formations:
+    size = (FOOT[f["model"]][0] + FOOT[f["model"]][1]) * f["scale"]
+    big = f["model"].split("_")[0] in ("Mound", "Fin", "Butte", "Arch")
+    fs = min(f["scale"], 2.2)
+    ring_around(f, -2, 10 + 6 * fs, int(size * (0.45 if big else 0.25)), "Boulder", 6,
+                (0.9 * fs, 2.2 * fs) if big else (0.6, 1.4), 0.3, 1.2, 5 * fs)
+    ring_around(f, -1, 22, int(size * 0.9), "Rock", 5, (0.6, 1.5), 0.1, 0, 8)
+    ring_around(f, 0, 18, int(size * 1.6), "Grass", 2, (0.8, 1.4), 0.03, 0, 7)
+    ring_around(f, 2, 22, int(size * 0.35), "Scrub", 3, (0.7, 1.3), 0.05, 0, 9)
+    if f["model"].startswith(("Mound", "Fin")):
+        ring_around(f, 3, 18, int(size * 0.12), "Yucca", 2, (0.8, 1.2), 0.02, 0, 8)
 
-# 1. The Chimneys: hoodoo field with rubble.
-cluster(L["chimneys"]["x"], L["chimneys"]["z"], 75, [
-    ("Hoodoo", 3, 16, (0.8, 1.4), 0.3, 4.5),
-    ("Boulder", 6, 45, (0.6, 1.5), 0.25, 1.4),
-    ("Rock", 5, 90, (0.6, 1.3), 0.1, 0),
-    ("Scrub", 3, 14, (0.7, 1.1), 0.05, 0),
-    ("Grass", 2, 40, (0.8, 1.3), 0.02, 0),
-], falloff=0.55)
-
-# 2. Rock garden: dense slabs and boulders with drivable gaps.
-cluster(L["rock_garden"]["x"], L["rock_garden"]["z"], 34, [
-    ("Slab", 3, 30, (0.8, 1.6), 0.15, 1.7),
-    ("Boulder", 6, 26, (0.6, 1.3), 0.3, 1.5),
-    ("Rock", 5, 50, (0.7, 1.4), 0.1, 0),
-], falloff=0.6)
-
-# 3. Talus fans: boulders spilling from the base of cliffs.
-steep = slope > 38
-dist_cliff = ndimage.distance_transform_edt(~steep) * CELL
-cand = np.argwhere((dist_cliff > 2) & (dist_cliff < 20) & (slope < 26))
-rng.shuffle(cand)
-n_b = n_r = 0
-for zi, xi in cand:
-    if n_b >= 650 and n_r >= 700:
-        break
-    dcl = dist_cliff[zi, xi]
-    if rng.random() > math.exp(-dcl / 6.0):
+# Road shoulders: grass and the odd shrub, thinning out in places (like the reference photo).
+gaps = fbm(14, 2, SEED + 30)
+for k in range(0, len(road), 3):
+    x0, z0 = road[k]
+    if not (20 < x0 < SIZE - 20 and 20 < z0 < SIZE - 20):
         continue
-    x, z = xi * CELL + rng.uniform(-0.5, 0.5), zi * CELL + rng.uniform(-0.5, 0.5)
-    if n_b < 650 and rng.random() < 0.5:
-        n_b += put("Boulder", 6, x, z, rng.uniform(0.9, 2.2) * (1.2 - dcl / 30), 0.3, 1.3)
-    elif n_r < 700:
-        n_r += put("Rock", 5, x, z, rng.uniform(0.6, 1.5), 0.1)
+    tx, tz = road[min(k + 1, len(road) - 1)] - road[max(k - 1, 0)]
+    ln = math.hypot(tx, tz) or 1
+    for side in (-1, 1):
+        if sample(gaps, x0, z0) < 0.42 and rng.random() < 0.7:
+            continue
+        off = side * rng.uniform(6.5, 12)
+        x, z = x0 + tz / ln * off, z0 - tx / ln * off
+        put("Grass", 2, x, z, rng.uniform(0.8, 1.4), 0.03, road_clear=6.0)
+        if rng.random() < 0.18:
+            put("Scrub", 3, x + rng.normal(0, 2), z + rng.normal(0, 2), rng.uniform(0.7, 1.2), 0.05, road_clear=7.0)
 
-# 4. Scrub patches where water collects (near the wash, in hollows), plus the oasis at the well.
-weight = np.exp(-(d_wash / 90.0) ** 2) * smoothstep(18, 4, slope) * (0.4 + np.clip(curv * 4, 0, 1))
+# Wash banks: grass, shrubs and a few dead trees where water passes.
+for k in range(0, len(wash), 4):
+    x0, z0 = wash[k]
+    if sample(wP, x0, z0) > 0.3:
+        continue
+    tx, tz = wash[min(k + 1, len(wash) - 1)] - wash[max(k - 1, 0)]
+    ln = math.hypot(tx, tz) or 1
+    for side in (-1, 1):
+        off = side * rng.uniform(9, 22)
+        x, z = x0 + tz / ln * off, z0 - tx / ln * off
+        put("Grass", 2, x, z, rng.uniform(0.9, 1.5), 0.03)
+        if rng.random() < 0.35:
+            put("Scrub", 3, x, z, rng.uniform(0.8, 1.4), 0.05)
+        if rng.random() < 0.025:
+            put("DeadTree", 2, x, z, rng.uniform(0.9, 1.3), 0.1, 3.0)
+
+# Open valley: loose clusters of grass and shrubs, denser in hollows.
+weight = smoothstep(20, 6, slope) * (1 - wP) * (1 - wD * 0.85) * (1 - wW * 0.8) * (0.3 + np.clip(curv * 5, 0, 1))
 flat_w = (weight / weight.sum()).ravel()
-centres = rng.choice(N * N, size=30, replace=False, p=flat_w)
-for c in centres:
+for c in rng.choice(N * N, size=70, replace=False, p=flat_w):
     zi, xi = divmod(int(c), N)
-    cluster(xi * CELL, zi * CELL, rng.uniform(10, 24), [
-        ("Scrub", 3, int(rng.integers(6, 22)), (0.7, 1.4), 0.05, 0),
-        ("Grass", 2, int(rng.integers(15, 45)), (0.7, 1.3), 0.02, 0),
-        ("Yucca", 2, int(rng.integers(0, 4)), (0.8, 1.2), 0.02, 0),
-        ("Rock", 5, int(rng.integers(0, 5)), (0.5, 1.0), 0.1, 0),
-    ])
-well = L["prospectors_well"]
-for k in range(10):   # ring of greenery around the well, outside the buildings
-    a = rng.uniform(0, 2 * math.pi)
-    cluster(well["x"] + math.cos(a) * 30, well["z"] + math.sin(a) * 30, 12, [
-        ("Scrub", 3, 8, (0.9, 1.5), 0.05, 0), ("Grass", 2, 20, (0.9, 1.4), 0.02, 0)])
+    cx, cz = xi * CELL, zi * CELL
+    for _ in range(int(rng.integers(10, 40))):
+        r = abs(rng.normal(0, 9))
+        a = rng.uniform(0, 2 * math.pi)
+        put("Grass", 2, cx + math.cos(a) * r, cz + math.sin(a) * r, rng.uniform(0.7, 1.3), 0.03)
+    for _ in range(int(rng.integers(1, 7))):
+        r = abs(rng.normal(0, 8))
+        a = rng.uniform(0, 2 * math.pi)
+        put("Scrub", 3, cx + math.cos(a) * r, cz + math.sin(a) * r, rng.uniform(0.7, 1.3), 0.05)
 
-# 5. Yucca stands on gentle slopes away from the wash.
-for _ in range(14):
-    for _try in range(50):
-        x, z = rng.uniform(80, SIZE - 80, 2)
-        if 4 < sample(slope, x, z) < 16 and sample(d_wash, x, z) > 50:
-            cluster(x, z, rng.uniform(10, 18), [("Yucca", 2, int(rng.integers(5, 12)), (0.8, 1.3), 0.02, 0),
-                                                ("Grass", 2, int(rng.integers(5, 15)), (0.8, 1.2), 0.02, 0)])
-            break
-
-# 6. Dead trees: small groves on the wash banks, plus lone sentinels.
-for _ in range(6):
-    k = int(rng.integers(0, len(t)))
-    side_ = 1 if rng.random() < 0.5 else -1
-    nx_, nz_ = path_z[min(k + 1, len(t) - 1)] - path_z[k], -(path_x[min(k + 1, len(t) - 1)] - path_x[k])
-    nl = math.hypot(nx_, nz_) or 1
-    cluster(path_x[k] + side_ * nx_ / nl * 22, path_z[k] + side_ * nz_ / nl * 22, 9,
-            [("DeadTree", 2, int(rng.integers(2, 5)), (0.8, 1.3), 0.1, 3.0),
-             ("Grass", 2, 12, (0.8, 1.2), 0.02, 0)])
-for _ in range(8):
-    x, z = rng.uniform(80, SIZE - 80, 2)
-    put("DeadTree", 2, x, z, rng.uniform(0.9, 1.4), 0.1, 3.0)
-
-# 7. A light sprinkle of small rocks so open ground isn't empty.
+# The Wave: tufts in the low pockets of the slickrock.
+low = h - ndimage.uniform_filter(h, 15)
 for _ in range(500):
-    x, z = rng.uniform(20, SIZE - 20, 2)
-    if rng.random() < 0.6:
-        put("Rock", 5, x, z, rng.uniform(0.4, 0.9), 0.08)
+    x, z = WAVE[0] + rng.normal(0, WAVE[2] * 0.45), WAVE[1] + rng.normal(0, WAVE[3] * 0.45)
+    if sample(low, x, z) < -0.6:
+        put("Grass", 2, x, z, rng.uniform(0.6, 1.0), 0.03)
 
-# Cairns marking the trail every ~90 m, plus a pair at each end of the rock garden.
+# The Chimneys: hoodoos with rubble between them.
+placed = 0
+for _ in range(400):
+    if placed >= 22:
+        break
+    r = 12 + abs(rng.normal(0, 30))
+    a = rng.uniform(0, 2 * math.pi)
+    placed += put("Hoodoo", 3, CHIMNEYS[0] + math.cos(a) * r, CHIMNEYS[1] + math.sin(a) * r, rng.uniform(0.8, 1.6), 0.3, 4.5)
+for _ in range(90):
+    r = abs(rng.normal(0, 35))
+    a = rng.uniform(0, 2 * math.pi)
+    put("Rock", 5, CHIMNEYS[0] + math.cos(a) * r, CHIMNEYS[1] + math.sin(a) * r, rng.uniform(0.6, 1.4), 0.1)
+    put("Grass", 2, CHIMNEYS[0] + math.cos(a + 1) * r, CHIMNEYS[1] + math.sin(a + 1) * r, rng.uniform(0.7, 1.2), 0.03)
+
+# The Rock Garden: slabs and boulders with drivable gaps between the ledges.
+for _ in range(220):
+    r = abs(rng.normal(0, 18))
+    a = rng.uniform(0, 2 * math.pi)
+    x, z = rg_x + math.cos(a) * r, rg_z + math.sin(a) * r
+    if rng.random() < 0.55:
+        put("Slab", 3, x, z, rng.uniform(0.8, 1.5), 0.15, 1.6)
+    else:
+        put("Boulder", 6, x, z, rng.uniform(0.6, 1.2), 0.3, 1.4)
+
+# Dead trees: a few lone sentinels on the valley floor.
+for _ in range(10):
+    x, z = rng.uniform(100, SIZE - 100, 2)
+    if sample(wP, x, z) < 0.1 and sample(wD, x, z) < 0.2:
+        put("DeadTree", 2, x, z, rng.uniform(0.9, 1.4), 0.1, 3.0)
+
+# Cairns along the wash.
 markers = []
-dist_acc, last = 0.0, (path_x[0], path_z[0])
-for k in range(1, len(t)):
-    dist_acc += math.hypot(path_x[k] - last[0], path_z[k] - last[1])
-    last = (path_x[k], path_z[k])
-    if dist_acc > 90 and 60 < path_x[k] < SIZE - 60 and 60 < path_z[k] < SIZE - 60:
-        dist_acc = 0.0
-        nx_, nz_ = path_z[min(k + 1, len(t) - 1)] - path_z[k], -(path_x[min(k + 1, len(t) - 1)] - path_x[k])
-        nl = math.hypot(nx_, nz_) or 1
-        markers.append(piece("Cairn", path_x[k] + nx_ / nl * 11, path_z[k] + nz_ / nl * 11, float(rng.uniform(0, 360)), 0.05))
-rg = L["rock_garden"]
+acc = 0.0
+for k in range(1, len(wash)):
+    acc += math.hypot(*(wash[k] - wash[k - 1]))
+    if acc > 85 and sample(wP, *wash[k]) < 0.3 and 40 < wash[k][0] < SIZE - 40:
+        acc = 0.0
+        tx, tz = wash[min(k + 1, len(wash) - 1)] - wash[k - 1]
+        ln = math.hypot(tx, tz) or 1
+        markers.append(piece("Cairn", wash[k][0] + tz / ln * 12, wash[k][1] - tx / ln * 12, float(rng.uniform(0, 360)), 0.05))
 for a in (0, math.pi):
-    markers.append(piece("Cairn", rg["x"] + math.cos(a) * 38, rg["z"] + math.sin(a) * 38, 0, 0.05))
+    markers.append(piece("Cairn", rg_x + math.cos(a) * 40, rg_z + math.sin(a) * 40, 0, 0.05))
 
-with open(os.path.join(SRC, "desert_scatter.json"), "w") as f:
-    json.dump({"props": props}, f, separators=(",", ":"))
+with open(os.path.join(SRC, "desert_scatter.json"), "w") as f_:
+    json.dump({"props": props}, f_, separators=(",", ":"))
 counts = {}
 for p in props:
     counts[p["kind"]] = counts.get(p["kind"], 0) + 1
-print("Props:", counts, "markers:", len(markers))
+print("Props:", counts, "formations:", len(formations), "markers:", len(markers))
 
-info = {"size": SIZE, "height": HEIGHT, "resolution": N, "splatResolution": SPLAT,
+road_x = [round(float(x), 2) for x, _ in road[::6]]
+road_z = [round(float(z), 2) for _, z in road[::6]]
+info = {"size": SIZE, "height": HEIGHT, "resolution": N, "splatResolution": S,
         "layers": ["Sand", "Gravel", "CrackedSoil", "RedRock"],
-        "spawn": {"x": round(spawn_x, 2), "z": round(spawn_z, 2), "yaw": round(heading, 1)},
-        "landmarks": landmarks, "markers": markers}
-with open(os.path.join(SRC, "desert_info.json"), "w") as f:
-    json.dump(info, f, indent=2)
-
-
-# ------------------------------------------------------------------------- textures
-print("Generating ground textures...")
-T = 512
-
-
-def tile_noise(beta, seed, size=T):
-    """Perfectly tileable 1/f^beta noise in [0,1] via FFT filtering."""
-    r = np.random.default_rng(seed)
-    f = np.fft.fftfreq(size)
-    fx, fy = np.meshgrid(f, f)
-    k = np.hypot(fx, fy)
-    k[0, 0] = 1
-    spec = np.fft.fft2(r.standard_normal((size, size))) / k ** (beta / 2)
-    spec[0, 0] = 0
-    n = np.real(np.fft.ifft2(spec))
-    return (n - n.min()) / (n.max() - n.min())
-
-
-def voronoi(cells, seed, size=T):
-    """Tileable Voronoi: (F1 distance, F2-F1 edge distance) in pixels."""
-    r = np.random.default_rng(seed)
-    pts = r.random((cells, 2)) * size
-    tiled = np.concatenate([pts + (dx * size, dy * size) for dx in (-1, 0, 1) for dy in (-1, 0, 1)])
-    yy, xx = np.mgrid[0:size, 0:size]
-    d, _ = cKDTree(tiled).query(np.c_[xx.ravel(), yy.ravel()], k=2)
-    return d[:, 0].reshape(size, size), (d[:, 1] - d[:, 0]).reshape(size, size)
-
-
-def colorize(t, c0, c1):
-    t = t[..., None]
-    return np.array(c0) * (1 - t) + np.array(c1) * t
-
-
-def save_maps(name, albedo, height, strength):
-    a = np.clip(albedo, 0, 1)
-    Image.fromarray((a * 255).astype(np.uint8), "RGB").save(os.path.join(TEX, f"{name}_albedo.png"))
-    gx = (np.roll(height, -1, 1) - np.roll(height, 1, 1)) * strength
-    gy = (np.roll(height, -1, 0) - np.roll(height, 1, 0)) * strength
-    n = np.stack([-gx, gy, np.ones_like(gx)], -1)
-    n /= np.linalg.norm(n, axis=-1, keepdims=True)
-    Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB").save(os.path.join(TEX, f"{name}_normal.png"))
-
-
-# Sand: warm orange with wind ripples.
-yy, xx = np.mgrid[0:T, 0:T] / T
-warp = tile_noise(2.5, 1)
-ripples = 0.5 + 0.5 * np.sin(2 * math.pi * (yy * 9 + xx * 2 + warp * 3.0))
-grain = tile_noise(0.6, 2)
-save_maps("Sand", colorize(0.62 * tile_noise(2.0, 3) + 0.10 * ripples + 0.28 * grain,
-                           (0.62, 0.45, 0.33), (0.80, 0.63, 0.47)), ripples * 0.35 + grain * 0.65, 2.5)
-
-# Gravel: pebbles in a dusty matrix.
-f1, edge = voronoi(260, 4)
-peb = smoothstep(9, 2, f1)
-tone = tile_noise(1.0, 5)
-alb = colorize(tone, (0.42, 0.31, 0.24), (0.62, 0.48, 0.38)) * (0.75 + 0.35 * peb[..., None])
-save_maps("Gravel", alb, peb * 0.8 + tile_noise(0.8, 6) * 0.2, 5.0)
-
-# Cracked soil: dried mud plates.
-f1, edge = voronoi(70, 7)
-crack = smoothstep(0, 3.5, edge)
-plate = tile_noise(1.5, 8)
-alb = colorize(plate, (0.62, 0.44, 0.31), (0.78, 0.60, 0.45)) * (0.45 + 0.55 * crack[..., None])
-save_maps("CrackedSoil", alb, crack * 0.9 + plate * 0.1, 7.0)
-
-# Red rock: sandstone strata and fractures.
-warp = tile_noise(3.0, 9)
-strata = 0.5 + 0.5 * np.sin(2 * math.pi * (yy * 9 + warp * 1.5))
-frac = smoothstep(0, 2.5, voronoi(40, 10)[1])
-detail = tile_noise(0.9, 11)
-alb = colorize(0.5 * strata + 0.3 * detail + 0.2 * tile_noise(2.0, 12), (0.42, 0.18, 0.11), (0.70, 0.38, 0.24))
-alb *= (0.6 + 0.4 * frac[..., None])
-save_maps("RedRock", alb, strata * 0.4 + detail * 0.3 + frac * 0.3, 8.0)
+        "spawn": {"x": round(spawn_x, 2), "z": round(spawn_z, 2), "yaw": round(spawn_heading, 1)},
+        "landmarks": landmarks, "markers": markers, "formations": formations, "roadX": road_x, "roadZ": road_z}
+with open(os.path.join(SRC, "desert_info.json"), "w") as f_:
+    json.dump(info, f_, indent=1)
 print("Done.")

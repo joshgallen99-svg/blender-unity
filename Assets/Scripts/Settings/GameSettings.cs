@@ -147,7 +147,7 @@ namespace Offroad.Settings
             foreach (var t in Terrain.activeTerrains)
             {
                 t.heightmapPixelError = s.detail >= 1.5f ? 3f : s.detail >= 1f ? 5f : 8f;
-                t.basemapDistance = s.viewDistance * 0.35f;
+                t.basemapDistance = 20000f;   // the desert shader handles distance itself
             }
 
             Changed?.Invoke(s);

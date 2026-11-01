@@ -57,8 +57,8 @@ namespace Offroad.EditorTools
         // Materials that use the project's custom shaders instead of URP Lit.
         static readonly Dictionary<string, System.Func<Material>> Custom = new Dictionary<string, System.Func<Material>>
         {
-            ["RockSandstone"] = () => Rock("RockSandstone", new Color(0.86f, 0.8f, 0.76f), 0.35f),
-            ["RockPale"] = () => Rock("RockPale", new Color(1.2f, 1.1f, 1.02f), 0.22f),
+            ["RockSandstone"] = () => Rock("RockSandstone", Color.white, 0.32f),
+            ["RockPale"] = () => Rock("RockPale", new Color(1.12f, 1.08f, 1.04f), 0.4f),
             ["Leaves"] = () => Foliage("Leaves", "ScrubLeaves", 0.07f, 1.4f),
             ["LeavesFlowering"] = () => Foliage("LeavesFlowering", "ScrubFlowering", 0.07f, 1.3f),
             ["GrassCards"] = () => Foliage("GrassCards", "DryGrass", 0.14f, 0.7f),
@@ -87,20 +87,66 @@ namespace Offroad.EditorTools
             return m;
         }
 
-        static Material Rock(string name, Color tint, float strata)
+        static Texture2D Tex(string name) => AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{name}.png");
+
+        static Material Rock(string name, Color tint, float sandOnLedges)
         {
             var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/RockTriplanar");
-            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/RedRock_albedo.png"));
-            m.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/RedRock_normal.png"));
-            m.SetTexture("_TopMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/Sand_albedo.png"));
-            m.SetTexture("_TopNormal", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Textures/Sand_normal.png"));
+            m.SetTexture("_BaseMap", Tex("Sandstone_albedo"));
+            m.SetTexture("_BumpMap", Tex("Sandstone_normal"));
+            m.SetTexture("_TopMap", Tex("Sand_albedo"));
+            m.SetTexture("_TopNormal", Tex("Sand_normal"));
+            m.SetTexture("_Macro", Tex("Macro"));
             m.SetColor("_BaseColor", tint);
-            m.SetColor("_TopColor", new Color(1.05f, 1.0f, 0.95f));
-            m.SetFloat("_Scale", 5f);
-            m.SetFloat("_TopScale", 9f);
-            m.SetFloat("_StrataStrength", strata);
-            m.SetFloat("_TopAmount", 0.5f);
+            m.SetColor("_TopColor", Color.white);
+            m.SetFloat("_Scale", 9f);
+            m.SetFloat("_TopScale", 6f);
+            m.SetFloat("_TopAmount", sandOnLedges);
+            m.SetFloat("_SkirtHeight", 1.2f);
             m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>Desert ground: sand / mud / pavement from the region mask, strata rock on slopes.</summary>
+        public static Material DesertTerrain(Texture2D mask)
+        {
+            var m = LoadOrCreate($"{Dir}/DesertTerrain.mat", "Offroad/DesertTerrain");
+            m.SetTexture("_Mask", mask);
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetTexture("_SandTex", Tex("Sand_albedo"));
+            m.SetTexture("_SandNrm", Tex("Sand_normal"));
+            m.SetTexture("_MudTex", Tex("Mud_albedo"));
+            m.SetTexture("_MudNrm", Tex("Mud_normal"));
+            m.SetTexture("_PaveTex", Tex("Pavement_albedo"));
+            m.SetTexture("_PaveNrm", Tex("Pavement_normal"));
+            m.SetTexture("_RockTex", Tex("Sandstone_albedo"));
+            m.SetTexture("_RockNrm", Tex("Sandstone_normal"));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        public static Material Backdrop(string name, Color lit, Color shadow, Color haze, float hazeAmount, float hazeHeight)
+        {
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Backdrop");
+            m.SetColor("_LitColor", lit);
+            m.SetColor("_ShadowColor", shadow);
+            m.SetColor("_HazeColor", haze);
+            m.SetFloat("_Haze", hazeAmount);
+            m.SetFloat("_HazeHeight", hazeHeight);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        public static Material Road()
+        {
+            var m = LoadOrCreate($"{Dir}/Road.mat", LitShader);
+            m.SetTexture("_BaseMap", Tex("Road_albedo"));
+            m.SetTexture("_BumpMap", Tex("Asphalt_normal"));
+            m.EnableKeyword("_NORMALMAP");
+            m.SetColor("_BaseColor", Color.white);
+            m.SetFloat("_Smoothness", 0.18f);
+            m.SetFloat("_Metallic", 0f);
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -186,10 +232,10 @@ namespace Offroad.EditorTools
             m.SetFloat("_SunDisk", 2f);               // high quality
             m.SetFloat("_SunSize", 0.035f);
             m.SetFloat("_SunSizeConvergence", 6f);
-            m.SetFloat("_AtmosphereThickness", 1.35f);
-            m.SetColor("_SkyTint", new Color(0.52f, 0.52f, 0.56f));
-            m.SetColor("_GroundColor", new Color(0.55f, 0.42f, 0.34f));
-            m.SetFloat("_Exposure", 1.15f);
+            m.SetFloat("_AtmosphereThickness", 0.95f);
+            m.SetColor("_SkyTint", new Color(0.44f, 0.52f, 0.68f));
+            m.SetColor("_GroundColor", new Color(0.62f, 0.50f, 0.44f));
+            m.SetFloat("_Exposure", 1.25f);
             EditorUtility.SetDirty(m);
             return m;
         }
