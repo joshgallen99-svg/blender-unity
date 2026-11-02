@@ -71,6 +71,13 @@ namespace Offroad.Garage
         {
             new TireDef
             {
+                id = "rock", name = "Rockjaw 37 Beadlock", mesh = "Wheel_Bead", price = 0, radius = 0.47f, width = 0.34f,
+                blurb = "37-inch crawler tyre on beadlocks: aired down, it wraps over rock and claws up ledges.",
+                grip = new Vector4(0.85f, 1.02f, 1.05f, 1.3f), sandDrag = 1.15f, rolling = 1.1f, mudGrip = 1.2f,
+                upgradeCost = new[] { 250, 420 },
+            },
+            new TireDef
+            {
                 id = "at", name = "Trailhound A/T", mesh = "Wheel_AT", price = 0, radius = 0.43f, width = 0.3f,
                 blurb = "All-terrain all-rounder. Good everywhere, best nowhere.",
                 grip = new Vector4(0.92f, 1.0f, 1.0f, 1.0f), sandDrag = 1.0f, rolling = 1.0f, mudGrip = 0.95f,
@@ -96,9 +103,24 @@ namespace Offroad.Garage
         {
             new BodyDef
             {
+                id = "crawler", name = "Ironbark", mesh = "Crawler", price = 0, mass = 1950f, steerAngle = 38f,
+                blurb = "Open-top rock crawler on solid axles and 37s. Huge articulation, stubby bumpers, sliders.",
+                centerOfMass = new Vector3(0f, 0.82f, 0.05f), cameraDistance = 7.2f,
+                colliders = new[]
+                {
+                    new BoxDef(new Vector3(0f, 1.18f, 0f), new Vector3(1.64f, 0.46f, 3.45f)),        // tub
+                    new BoxDef(new Vector3(0f, 0.71f, 0f), new Vector3(1.04f, 0.12f, 2.3f)),         // belly skid
+                    new BoxDef(new Vector3(0f, 0.86f, 0.1f), new Vector3(1.04f, 0.2f, 3.8f)),        // frame rails
+                    new BoxDef(new Vector3(0f, 0.95f, 1.91f), new Vector3(1.48f, 0.3f, 0.36f)),      // winch bumper
+                    new BoxDef(new Vector3(0f, 0.91f, -1.81f), new Vector3(1.4f, 0.24f, 0.24f)),     // rear bumper
+                    new BoxDef(new Vector3(0f, 1.74f, -0.1f), new Vector3(1.56f, 0.66f, 2.2f)),      // cage
+                },
+            },
+            new BodyDef
+            {
                 id = "ridgeback", name = "Ridgeback", mesh = "Ridgeback", price = 0, mass = 1800f, steerAngle = 34f,
                 blurb = "Short-wheelbase wagon. Nimble, clears crests easily, a little twitchy at speed.",
-                centerOfMass = new Vector3(0f, 0.58f, 0.05f), cameraDistance = 6.8f,
+                centerOfMass = new Vector3(0f, 0.72f, 0.05f), cameraDistance = 6.8f,
                 colliders = new[]
                 {
                     new BoxDef(new Vector3(0f, 0.95f, 0.01f), new Vector3(1.80f, 0.56f, 3.98f)),
@@ -110,7 +132,7 @@ namespace Offroad.Garage
             {
                 id = "packhorse", name = "Packhorse", mesh = "Packhorse", price = 900, mass = 2150f, steerAngle = 31f,
                 blurb = "Long-wheelbase pickup. Planted and stable at speed, but can high-centre on sharp crests.",
-                centerOfMass = new Vector3(0f, 0.6f, 0.15f), cameraDistance = 7.6f,
+                centerOfMass = new Vector3(0f, 0.76f, 0.15f), cameraDistance = 7.6f,
                 colliders = new[]
                 {
                     new BoxDef(new Vector3(0f, 0.95f, -0.15f), new Vector3(1.80f, 0.56f, 4.80f)),

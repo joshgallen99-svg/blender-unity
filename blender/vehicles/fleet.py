@@ -3,9 +3,14 @@
 Run:  python blender/vehicles/fleet.py
 Writes: Assets/Models/Vehicles/Fleet.fbx
 Objects:
+  Body_Crawler     open-top rock crawler on 37s (2.6 m wheelbase): exo cage, flat fenders, sliders,
+                   stubby winch bumper, tyre carrier. Its solid axles are separate parts (below).
   Body_Ridgeback   short-wheelbase 4x4 wagon (2.5 m wheelbase)
   Body_Packhorse   long-wheelbase pickup with a load bed (3.0 m wheelbase)
-  Wheel_AT / Wheel_MT / Wheel_Dune   tyre + rim, axle along X, show face toward vehicle left
+  Wheel_AT / Wheel_MT / Wheel_Dune / Wheel_Bead   tyre + rim, axle along X, show face toward vehicle left
+  Axle_Housing     solid-axle housing with diff, centred on the origin, along X (placed between the wheels in game)
+  Link_Unit, Coilover_Unit   1 m long along the vehicle's forward axis from the origin; stretched in game
+                   between their chassis and axle mounts, so the suspension visibly articulates
   RoofRack_<Body>, Snorkel_<Body>, BullBar_<Body>   accessories (toggled in the garage)
   <Body>_WheelFL/FR/RL/RR, <Body>_Spare   empties: wheel centres and the spare wheel mount
 
@@ -237,6 +242,172 @@ def bull_bar(M, name, S):
     return obj
 
 
+# ---------------------------------------------------------------------------------- rock crawler
+
+CR = dict(front_axle=-1.30, rear_axle=1.30, track=0.94, wheel_r=0.47, tub_front=-1.98, tub_rear=1.72,
+          cowl=-0.52, hoop=0.38, rear_hoop=1.52)
+
+
+def build_crawler(M):
+    P = []
+    add = P.append
+    F, R = CR["tub_front"], CR["tub_rear"]
+    FA, RA, WR = CR["front_axle"], CR["rear_axle"], CR["wheel_r"]
+    cowl, hoop, rhoop = CR["cowl"], CR["hoop"], CR["rear_hoop"]
+
+    # Tub: high, with big arches cut for 37s and full articulation.
+    tub = C.box_between("tub", -0.82, 0.82, F + 0.25, R, 0.95, 1.40, M["Paint"], bevel=0.035, segments=3)
+    C.boolean_cut(tub, [C.cylinder(f"arch{i}", 0.68, 2.4, (0, y, WR + 0.05), "X", 40) for i, y in enumerate((FA, RA))])
+    add(tub)
+    # Bonnet, raked slightly, and the grille: horizontal mesh with round lamps either side.
+    add(C.hull("bonnet", [(-0.80, F + 0.25, 1.36), (0.80, F + 0.25, 1.36), (0.80, cowl, 1.40), (-0.80, cowl, 1.40)],
+               [(-0.78, F + 0.27, 1.43), (0.78, F + 0.27, 1.43), (0.78, cowl, 1.50), (-0.78, cowl, 1.50)],
+               M["Paint"], bevel=0.02))
+    add(C.box_between("grille", -0.66, 0.66, F + 0.22, F + 0.27, 0.98, 1.38, M["Trim"], bevel=0.01))
+    for z in (1.04, 1.10, 1.16, 1.22, 1.28, 1.34):
+        add(C.box_between("slat", -0.36, 0.36, F + 0.205, F + 0.22, z - 0.014, z + 0.014, M["Steel"]))
+    for s in (1, -1):
+        add(C.cylinder("lampring", 0.12, 0.03, (s * 0.52, F + 0.21, 1.20), "Y", 24, M["Steel"]))
+        add(C.cylinder("lamp", 0.1, 0.03, (s * 0.52, F + 0.20, 1.20), "Y", 24, M["Lights"]))
+        add(C.box_between("taillight", *sx(s, 0.66, 0.78), R - 0.005, R + 0.02, 1.12, 1.30, M["TailLights"], bevel=0.008))
+        # Flat tube fenders: a flat top plus a steel tube outline, high over the tyres.
+        for y in (FA, RA):
+            add(C.box_between("fender", *sx(s, 0.80, 1.12), y - 0.62, y + 0.62, 1.37, 1.40, M["Trim"], bevel=0.008))
+            # Tube edge along the outside of the flat fender, bending back in to the tub at each end.
+            add(C.tube_path("fendertube", [(s * 0.84, y - 0.66, 1.30), (s * 1.10, y - 0.60, 1.37), (s * 1.12, y, 1.38),
+                                           (s * 1.10, y + 0.60, 1.37), (s * 0.84, y + 0.66, 1.30)], 0.022, M["Steel"], 8))
+            add(C.box_between("fenderliner", *sx(s, 0.80, 1.10), y + (0.6 if y < 0 else -0.62), y + (0.62 if y < 0 else -0.6),
+                              1.0, 1.37, M["Trim"]))
+        # Rock sliders with uprights to the frame.
+        y0, y1 = FA + 0.72, RA - 0.72
+        add(C.tube_path("slider", [(s * 0.80, y0 - 0.05, 0.92), (s * 0.98, y0, 0.84), (s * 0.98, y1, 0.84),
+                                   (s * 0.80, y1 + 0.05, 0.92)], 0.038, M["Steel"], 10))
+        add(C.tube("sliderkick", (s * 0.98, y0 + 0.1, 0.84), (s * 1.0, y0 + 0.1, 1.05), 0.028, M["Steel"], 8))
+        for y in (y0 + 0.5, (y0 + y1) / 2, y1 - 0.3):
+            add(C.tube("sliderleg", (s * 0.98, y, 0.84), (s * 0.55, y, 0.78), 0.026, M["Steel"], 8))
+        # Exo cage: A-pillars from the cowl, roof rails, main hoop, rear hoop down to the tub corners.
+        add(C.tube_path("cage", [(s * 0.80, cowl, 1.46), (s * 0.74, cowl + 0.32, 2.04), (s * 0.74, hoop, 2.06),
+                                 (s * 0.74, rhoop - 0.2, 2.0), (s * 0.80, R - 0.05, 1.42)], 0.03, M["Steel"], 10))
+        add(C.tube("hoopleg", (s * 0.80, hoop, 1.40), (s * 0.74, hoop, 2.06), 0.032, M["Steel"], 10))
+        add(C.tube("harness", (s * 0.74, hoop, 1.70), (s * 0.30, hoop - 0.02, 1.70), 0.02, M["Steel"], 8))
+        add(C.tube("aframe", (s * 0.80, cowl + 0.05, 1.46), (s * 0.82, F + 0.30, 1.44), 0.022, M["Steel"], 8))
+        # Seats and a low door bar.
+        add(C.box_between("seat", *sx(s, 0.12, 0.62), hoop - 0.55, hoop - 0.10, 1.10, 1.22, M["Trim"], bevel=0.03))
+        add(C.box_between("seatback", *sx(s, 0.14, 0.60), hoop - 0.16, hoop - 0.04, 1.20, 1.88, M["Trim"], bevel=0.03))
+        add(C.tube("doorbar", (s * 0.82, cowl + 0.1, 1.52), (s * 0.82, hoop - 0.05, 1.52), 0.022, M["Steel"], 8))
+        add(C.box_between("mirror", *sx(s, 0.80, 0.94), cowl + 0.25, cowl + 0.30, 1.78, 1.88, M["Trim"], bevel=0.01))
+    for y in (cowl + 0.32, hoop, rhoop - 0.2):
+        add(C.tube("cagebar", (-0.74, y, 2.05), (0.74, y, 2.05), 0.028, M["Steel"], 10))
+    add(C.tube("diag", (-0.74, hoop, 2.06), (0.74, hoop, 1.45), 0.026, M["Steel"], 8))
+    # Upright windscreen frame and glass.
+    add(C.tube_path("wsframe", [(-0.78, cowl + 0.02, 1.50), (-0.76, cowl + 0.06, 1.96), (0.76, cowl + 0.06, 1.96),
+                                (0.78, cowl + 0.02, 1.50)], 0.025, M["Trim"], 8))
+    add(C.hull("windscreen", [(-0.74, cowl + 0.02, 1.52), (0.74, cowl + 0.02, 1.52), (0.74, cowl + 0.035, 1.52), (-0.74, cowl + 0.035, 1.52)],
+               [(-0.72, cowl + 0.055, 1.94), (0.72, cowl + 0.055, 1.94), (0.72, cowl + 0.07, 1.94), (-0.72, cowl + 0.07, 1.94)],
+               M["Glass"]))
+    add(C.box_between("dash", -0.76, 0.76, cowl, cowl + 0.25, 1.40, 1.58, M["Trim"], bevel=0.02))
+    add(C.cylinder("wheelrim", 0.18, 0.03, (0.35, cowl + 0.32, 1.62), "Y", 20, M["Trim"]))
+    # LED pods on the A-pillars and a light bar on the front cage bar.
+    for s in (1, -1):
+        add(C.box_between("pod", *sx(s, 0.66, 0.80), cowl + 0.12, cowl + 0.2, 1.88, 1.98, M["Trim"], bevel=0.01))
+        add(C.box_between("podlens", *sx(s, 0.68, 0.78), cowl + 0.108, cowl + 0.12, 1.895, 1.965, M["Lights"]))
+    add(C.box_between("lightbar", -0.6, 0.6, cowl + 0.28, cowl + 0.36, 2.09, 2.17, M["Trim"], bevel=0.01))
+    add(C.box_between("lightbarlens", -0.57, 0.57, cowl + 0.272, cowl + 0.28, 2.10, 2.16, M["Lights"]))
+
+    # Stubby winch bumper: clears the tyres for approach angle, with winch, fairlead and shackles.
+    add(C.box_between("fbumper", -0.62, 0.62, F - 0.10, F + 0.24, 0.80, 1.04, M["Steel"], bevel=0.02))
+    add(C.cylinder("winchdrum", 0.1, 0.5, (0, F + 0.03, 1.12), "X", 20, M["Trim"]))
+    add(C.cylinder("winchmotor", 0.085, 0.16, (-0.33, F + 0.03, 1.12), "X", 16, M["Trim"]))
+    add(C.box_between("fairlead", -0.12, 0.12, F - 0.13, F - 0.09, 0.86, 0.98, M["Chrome"]))
+    add(C.tube_path("stinger", [(-0.5, F - 0.02, 1.04), (-0.22, F - 0.12, 1.30), (0.22, F - 0.12, 1.30), (0.5, F - 0.02, 1.04)],
+                    0.03, M["Steel"], 10))
+    for s in (1, -1):
+        add(C.cylinder("shackle", 0.055, 0.025, (s * 0.46, F - 0.13, 0.92), "X", 16, M["Accent"]))
+        add(C.box_between("fbumperwing", *sx(s, 0.62, 0.74), F + 0.0, F + 0.24, 0.86, 1.02, M["Steel"], bevel=0.015))
+    # Rear bumper with a swing-out tyre carrier.
+    add(C.box_between("rbumper", -0.70, 0.70, R - 0.02, R + 0.20, 0.80, 1.02, M["Steel"], bevel=0.02))
+    add(C.tube_path("carrier", [(-0.62, R + 0.20, 1.0), (-0.5, R + 0.24, 1.55), (0.5, R + 0.24, 1.55), (0.62, R + 0.20, 1.0)],
+                    0.03, M["Steel"], 10))
+    add(C.box_between("hitch", -0.06, 0.06, R + 0.20, R + 0.32, 0.82, 0.90, M["Steel"]))
+    # Frame, belly skid and engine sump guard (the underside the rocks will hit).
+    for s in (1, -1):
+        add(C.box_between("rail", *sx(s, 0.42, 0.52), F + 0.0, R + 0.02, 0.76, 0.90, M["Chassis"]))
+    add(C.hull("skid", [(-0.5, FA + 0.55, 0.66), (0.5, FA + 0.55, 0.66), (0.5, RA - 0.6, 0.66), (-0.5, RA - 0.6, 0.66)],
+               [(-0.52, FA + 0.5, 0.76), (0.52, FA + 0.5, 0.76), (0.52, RA - 0.55, 0.76), (-0.52, RA - 0.55, 0.76)], M["Steel"]))
+    add(C.tube("driveshaft", (0, FA + 0.1, WR + 0.02), (0, -0.2, 0.72), 0.04, M["Chassis"], 10))
+    add(C.tube("driveshaft2", (0, 0.4, 0.72), (0, RA - 0.15, WR + 0.02), 0.04, M["Chassis"], 10))
+    add(C.tube("antenna", (-0.74, hoop, 2.06), (-0.74, hoop + 0.08, 3.0), 0.006, M["Trim"], 6))
+
+    body = C.join(P, "Body_Crawler")
+    C.smooth_by_angle(body, 32)
+    return body
+
+
+def crawler_accessories(M):
+    hoop, rhoop, cowl = CR["hoop"], CR["rear_hoop"], CR["cowl"]
+    F = CR["tub_front"]
+    objs = []
+    P = [C.tube_path("rack", [(-0.70, cowl + 0.4, 2.13), (0.70, cowl + 0.4, 2.13), (0.70, rhoop - 0.25, 2.13),
+                              (-0.70, rhoop - 0.25, 2.13), (-0.70, cowl + 0.4, 2.13)], 0.02, M["Steel"], 8)]
+    for y in (cowl + 0.8, hoop + 0.25, hoop + 0.7):
+        P.append(C.tube("slat", (-0.7, y, 2.13), (0.7, y, 2.13), 0.016, M["Steel"], 8))
+    P += [C.box_between("case", -0.62, -0.06, hoop + 0.1, hoop + 0.9, 2.15, 2.38, M["Trim"], bevel=0.025),
+          C.box_between("jerry", 0.2, 0.38, hoop + 0.2, hoop + 0.7, 2.15, 2.5, M["Paint2"], bevel=0.02),
+          C.cylinder("tarp", 0.09, 1.2, (0, cowl + 0.6, 2.24), "X", 16, M["Canvas"], bevel=0.02),
+          C.box_between("maxtrax", 0.42, 0.66, cowl + 0.45, hoop + 0.6, 2.15, 2.2, M["Accent"], bevel=0.01)]
+    rack = C.join(P, "RoofRack_Crawler")
+    C.smooth_by_angle(rack, 35)
+    objs.append(rack)
+    sn = C.join([C.tube_path("snorkel", [(-0.84, cowl - 0.45, 1.30), (-0.86, cowl - 0.1, 1.42), (-0.84, cowl + 0.05, 1.7),
+                                         (-0.80, cowl + 0.08, 2.1), (-0.80, cowl + 0.1, 2.22)], 0.045, M["Trim"]),
+                 C.box_between("snorkelhead", -0.87, -0.73, cowl - 0.02, cowl + 0.2, 2.18, 2.32, M["Trim"], bevel=0.02)],
+                "Snorkel_Crawler")
+    C.smooth_by_angle(sn, 35)
+    objs.append(sn)
+    bb = [C.tube_path("hoop", [(-0.6, F - 0.05, 1.04), (-0.5, F - 0.05, 1.45), (0.5, F - 0.05, 1.45), (0.6, F - 0.05, 1.04)],
+                      0.034, M["Steel"])]
+    for s in (1, -1):
+        bb.append(C.cylinder("spot", 0.08, 0.09, (s * 0.3, F - 0.10, 1.52), "Y", 16, M["Trim"]))
+        bb.append(C.cylinder("spotlens", 0.065, 0.02, (s * 0.3, F - 0.15, 1.52), "Y", 16, M["Lights"]))
+    bull = C.join(bb, "BullBar_Crawler")
+    C.smooth_by_angle(bull, 35)
+    objs.append(bull)
+    return objs
+
+
+def axle_parts(M):
+    """Solid-axle housing, a suspension link and a coilover, as separate parts the game poses every frame."""
+    half = CR["track"] - 0.16
+    P = [C.cylinder("tube", 0.065, 2 * half, (0, 0, 0), "X", 16, M["Chassis"]),
+         C.sphere("pumpkin", 0.17, (0.14, 0.02, 0.0), M["Chassis"]),
+         C.cylinder("diffcover", 0.15, 0.06, (0.14, 0.15, 0.0), "Y", 20, M["Accent"]),
+         C.box_between("truss", -half + 0.1, half - 0.1, -0.03, 0.03, 0.06, 0.1, M["Chassis"])]
+    for s in (1, -1):
+        P.append(C.cylinder("knuckle", 0.11, 0.12, (s * (half - 0.02), 0, 0), "X", 18, M["Chassis"]))
+        for dy in (-0.08, 0.08):
+            P.append(C.box_between("linktab", *sx(s, 0.3, 0.36), dy - 0.02, dy + 0.02, -0.12, 0.12, M["Steel"]))
+    axle = C.join(P, "Axle_Housing")
+    C.smooth_by_angle(axle, 40)
+    # Link: rod ends at both ends (forward = Blender -Y, so the far end is at y = -1).
+    link = C.join([C.tube("rod", (0, -0.04, 0), (0, -0.96, 0), 0.03, M["Steel"], 10),
+                   C.cylinder("eye0", 0.045, 0.05, (0, -0.02, 0), "X", 14, M["Chassis"]),
+                   C.cylinder("eye1", 0.045, 0.05, (0, -0.98, 0), "X", 14, M["Chassis"])], "Link_Unit")
+    C.smooth_by_angle(link, 40)
+    # Coilover: body and reservoir at the top (y = 0), spring around it, shaft down to the axle (y = -1).
+    coil = [C.cylinder("body", 0.045, 0.55, (0, -0.30, 0), "Y", 14, M["Chrome"]),
+            C.cylinder("reservoir", 0.03, 0.3, (0.07, -0.18, 0), "Y", 10, M["Chrome"]),
+            C.tube("shaft", (0, -0.55, 0), (0, -0.98, 0), 0.016, M["Chrome"], 8),
+            C.cylinder("eye", 0.035, 0.05, (0, -0.99, 0), "X", 12, M["Chassis"])]
+    turns, pts = 7, []
+    for i in range(turns * 12 + 1):
+        a = 2 * math.pi * i / 12
+        pts.append((0.075 * math.cos(a), -0.08 - 0.72 * i / (turns * 12), 0.075 * math.sin(a)))
+    coil.append(C.tube_path("spring", pts, 0.012, M["Accent"], 6))
+    coilover = C.join(coil, "Coilover_Unit")
+    C.smooth_by_angle(coilover, 40)
+    return [axle, link, coilover]
+
+
 def spare_mount(S):
     if S["bed"]:
         return (0.0, S["cab_rb"] + 0.30, 1.24 + WHEEL_R + 0.02)
@@ -246,7 +417,11 @@ def spare_mount(S):
 def build():
     C.reset_scene()
     M = palette()
-    objs = []
+    objs = [build_crawler(M)] + crawler_accessories(M) + axle_parts(M)
+    for n, s, y in (("WheelFL", 1, CR["front_axle"]), ("WheelFR", -1, CR["front_axle"]),
+                    ("WheelRL", 1, CR["rear_axle"]), ("WheelRR", -1, CR["rear_axle"])):
+        objs.append(C.empty(f"Crawler_{n}", (s * CR["track"], y, CR["wheel_r"])))
+    objs.append(C.empty("Crawler_Spare", (0.0, CR["tub_rear"] + 0.52, 1.30)))
     for name, S in BODIES.items():
         objs.append(build_body(M, name, S))
         objs += [roof_rack(M, name, S), snorkel(M, name, S), bull_bar(M, name, S)]
@@ -257,6 +432,7 @@ def build():
     objs.append(W.build("Wheel_AT", WHEEL_R, WHEEL_W, mats=M, style="at"))
     objs.append(W.build("Wheel_MT", 0.44, 0.33, mats=M, style="mt"))
     objs.append(W.build("Wheel_Dune", 0.44, 0.40, mats=M, style="dune"))
+    objs.append(W.build("Wheel_Bead", 0.47, 0.34, rim_radius=0.24, mats=M, style="bead"))
     return objs
 
 

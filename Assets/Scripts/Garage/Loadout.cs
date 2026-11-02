@@ -16,14 +16,14 @@ namespace Offroad.Garage
             public int level;
         }
 
-        public string body = "ridgeback";
-        public string tire = "at";
+        public string body = "crawler";
+        public string tire = "rock";
         public string spare = "dune";
         public int engineLevel;
         public int suspensionLevel;
         public int paint;
-        public List<string> ownedBodies = new List<string> { "ridgeback" };
-        public List<string> ownedTires = new List<string> { "at", "dune" };
+        public List<string> ownedBodies = new List<string> { "crawler", "ridgeback" };
+        public List<string> ownedTires = new List<string> { "rock", "at", "dune" };
         public List<string> ownedAccessories = new List<string> { "RoofRack" };
         public List<string> fittedAccessories = new List<string> { "RoofRack" };
         public List<Level> tireLevels = new List<Level>();
@@ -131,7 +131,19 @@ namespace Offroad.Garage
             try
             {
                 var json = PlayerPrefs.GetString(Key, "");
-                if (!string.IsNullOrEmpty(json)) return JsonUtility.FromJson<Loadout>(json) ?? new Loadout();
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var l = JsonUtility.FromJson<Loadout>(json) ?? new Loadout();
+                    // Saves from before the crawler: hand it over, with its tyres, and drive it.
+                    if (!l.ownedBodies.Contains("crawler"))
+                    {
+                        l.ownedBodies.Insert(0, "crawler");
+                        if (!l.ownedTires.Contains("rock")) l.ownedTires.Insert(0, "rock");
+                        l.body = "crawler";
+                        l.tire = "rock";
+                    }
+                    return l;
+                }
             }
             catch (Exception e) { Debug.LogWarning("Loadout reset: " + e.Message); }
             return new Loadout();

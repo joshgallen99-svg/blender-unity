@@ -22,10 +22,12 @@ namespace Offroad.Vehicles
             public Vector3[] wheelPositions = new Vector3[4];   // FL, FR, RL, RR wheel centres at rest
             public Vector3 spareMount;
             public Part[] accessories;
+            public bool solidAxles;                            // pose the shared axle / link / coilover parts
         }
 
         public BodyArt[] bodies;
         public Part[] tires;
+        public Part axleHousing, link, coilover;
         public Material dustMaterial;
         public PhysicsMaterial bodyPhysics;
 

@@ -45,13 +45,14 @@ def _ring_of_boxes(name, count, size, radius, x, mat, phase=0.0, tilt=0.0):
 
 def build(name="Wheel", radius=0.43, width=0.32, rim_radius=0.255, detail=1.0, mats=None, style="at"):
     """style: "at" all-terrain (bronze beadlock), "mt" mud/crawler (big blocks, black steel),
-    "dune" sand floater (wide balloon tyre, paddle ribs, white spokes)."""
+    "dune" sand floater (wide balloon tyre, paddle ribs, white spokes),
+    "bead" 37-inch rock-crawler mud tyre on a black wheel with a bolted bronze beadlock ring."""
     tire_m, steel_m, dark_m = mats["Tire"], mats["Steel"], mats["Trim"]
-    rim_m = mats.get({"at": "Rim", "mt": "RimBlack", "dune": "RimWhite"}[style], mats["Rim"])
+    rim_m = mats.get({"at": "Rim", "mt": "RimBlack", "dune": "RimWhite", "bead": "RimBlack"}[style], mats["Rim"])
     R, w, rb = radius, width, rim_radius
     hw = w / 2
     seg = max(16, int(40 * detail))
-    lug_h = {"at": 0.024, "mt": 0.034, "dune": 0.012}[style]
+    lug_h = {"at": 0.024, "mt": 0.034, "dune": 0.012, "bead": 0.04}[style]
     core = R - lug_h * 0.6
     sh = 0.07 if style != "dune" else 0.11          # rounder shoulders on the balloon tyre
 
@@ -76,6 +77,15 @@ def build(name="Wheel", radius=0.43, width=0.32, rim_radius=0.255, detail=1.0, m
         if detail >= 0.75:
             parts.append(_ring_of_boxes(name + "_shA", lugs, (0.05, 0.09, 0.13), core - 0.05, -hw + 0.01, tire_m, step / 2))
             parts.append(_ring_of_boxes(name + "_shB", lugs, (0.05, 0.09, 0.13), core - 0.05, hw - 0.01, tire_m, 0.0))
+    elif style == "bead":
+        # Big staggered tread blocks and deep shoulder lugs wrapping onto the sidewall.
+        lugs = max(10, int(18 * detail))
+        step = 2 * math.pi / lugs
+        parts.append(_ring_of_boxes(name + "_lugA", lugs, (0.15, 0.12, lug_h * 2), core, -0.075, tire_m, 0.0, 0.25))
+        parts.append(_ring_of_boxes(name + "_lugB", lugs, (0.15, 0.12, lug_h * 2), core, 0.075, tire_m, step / 2, -0.25))
+        if detail >= 0.5:
+            parts.append(_ring_of_boxes(name + "_shA", lugs, (0.06, 0.1, 0.16), core - 0.06, -hw + 0.012, tire_m, step / 2))
+            parts.append(_ring_of_boxes(name + "_shB", lugs, (0.06, 0.1, 0.16), core - 0.06, hw - 0.012, tire_m, 0.0))
     else:
         ribs = max(12, int(18 * detail))
         parts.append(_ring_of_boxes(name + "_ribA", ribs, (w * 0.45, 0.03, lug_h * 2), core, -w * 0.22, tire_m, 0.0, 0.5))
@@ -88,6 +98,16 @@ def build(name="Wheel", radius=0.43, width=0.32, rim_radius=0.255, detail=1.0, m
         parts.append(_revolve(name + "_bead", [(hw - 0.035, rb - 0.045), (hw - 0.005, rb - 0.04), (hw - 0.005, rb + 0.012),
                                                 (hw - 0.035, rb + 0.012)], seg, rim_m))
         spokes, spoke_r = 6, 0.024
+    elif style == "bead":
+        bead_m = mats["Rim"]
+        parts.append(_revolve(name + "_bead", [(hw - 0.04, rb - 0.05), (hw + 0.004, rb - 0.045), (hw + 0.004, rb + 0.02),
+                                                (hw - 0.04, rb + 0.02)], seg, bead_m))
+        parts.append(C.cylinder(name + "_disc", rb - 0.05, 0.025, (hw - 0.05, 0, 0), "X", seg, rim_m))
+        for i in range(8):     # machined windows in the face
+            a = 2 * math.pi * i / 8 + math.pi / 8
+            parts.append(C.cylinder(f"{name}_win{i}", 0.03, 0.03, (hw - 0.035, 0.13 * math.cos(a), 0.13 * math.sin(a)),
+                                    "X", 10, dark_m))
+        spokes, spoke_r = 0, 0
     elif style == "mt":
         parts.append(C.cylinder(name + "_disc", rb - 0.03, 0.025, (hw - 0.045, 0, 0), "X", seg, rim_m))
         for i in range(8):     # steel-wheel holes (dark insets)
@@ -105,6 +125,8 @@ def build(name="Wheel", radius=0.43, width=0.32, rim_radius=0.255, detail=1.0, m
     parts.append(C.cylinder(name + "_hub", 0.075, 0.07, (hw - 0.03, 0, 0), "X", 20, rim_m, radius2=0.06))
     parts.append(C.cylinder(name + "_cap", 0.035, 0.03, (hw + 0.005, 0, 0), "X", 16, steel_m))
     if detail >= 0.75:
+        if style == "bead":
+            parts.append(_ring_of_boxes(name + "_bolts", 24, (0.018, 0.016, 0.016), rb - 0.012, hw + 0.008, steel_m))
         if style == "at":
             parts.append(_ring_of_boxes(name + "_bolts", 16, (0.016, 0.014, 0.014), rb - 0.015, hw - 0.002, steel_m))
         parts.append(_ring_of_boxes(name + "_nuts", 6, (0.02, 0.018, 0.018), 0.05, hw + 0.006, steel_m, math.pi / 6))
