@@ -145,6 +145,9 @@ def mesh_from_sdf(name, g, sd, mat, target_tris):
         except ValueError:
             pass
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=g.voxel * 0.25)
+    # Faces must wind outward (positive volume), or the engine culls the outside and shows the inside.
+    if bm.calc_volume(signed=True) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()

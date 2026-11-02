@@ -95,7 +95,23 @@ namespace Offroad.Rendering
                 renderGraph.AddBlitPass(new RenderGraphUtils.BlitMaterialParameters(source, a, _mat, 0), "Sun Shafts Prefilter");
                 renderGraph.AddBlitPass(new RenderGraphUtils.BlitMaterialParameters(a, b, _mat, 1), "Sun Shafts Radial 1");
                 renderGraph.AddBlitPass(new RenderGraphUtils.BlitMaterialParameters(b, a, _mat, 1), "Sun Shafts Radial 2");
-                renderGraph.AddBlitPass(new RenderGraphUtils.BlitMaterialParameters(a, source, _mat, 2), "Sun Shafts Composite");
+                // Additive composite onto the scene. ReadWrite keeps the scene (a plain blit pass declares
+                // Write-only, and tile-based GPUs such as Apple's then don't load what was there).
+                using (var builder = renderGraph.AddRasterRenderPass<CompositeData>("Sun Shafts Composite", out var data))
+                {
+                    data.rays = a;
+                    data.material = _mat;
+                    builder.UseTexture(a, AccessFlags.Read);
+                    builder.SetRenderAttachment(source, 0, AccessFlags.ReadWrite);
+                    builder.SetRenderFunc((CompositeData d, RasterGraphContext ctx) =>
+                        Blitter.BlitTexture(ctx.cmd, d.rays, new Vector4(1f, 1f, 0f, 0f), d.material, 2));
+                }
+            }
+
+            class CompositeData
+            {
+                public TextureHandle rays;
+                public Material material;
             }
         }
     }
