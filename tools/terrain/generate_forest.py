@@ -288,7 +288,7 @@ def side_of(x, z, t):
     return 1 if ((x - river[k][0]) * tz - (z - river[k][1]) * tx) > 0 else -1
 
 
-start = (690, 15)
+start = (686, 68)                                      # clear of the steep edge mountains: spawn on level ground
 MAIN = [start, (680, 100), (660, 170)]
 MAIN += crossing(FORDS[1], side_of(660, 170, FORDS[1]))
 MAIN += [(700, 330), (652, 405), (640, 468)]
@@ -318,11 +318,26 @@ for sp in side_paths.values():
     d_side = np.minimum(d_side, path_field(sp)[0])
 d_track = np.minimum(d_main, d_side)
 
-# Grade tracks lightly (they follow the land); keep the fords at the river bed.
-for path, width, strength in [(main, 3.2, 0.8)] + [(sp, 2.6, 0.75) for sp in side_paths.values()]:
+# Grade the tracks: smoothed profile with its gradient capped (cut into rises, built up over dips), the
+# terrain benched to it with banks that widen with the cut; the fords stay at the river bed.
+def grade_limited(profile, step, max_deg):
+    g = math.tan(math.radians(max_deg)) * step
+    p = profile.copy()
+    for _ in range(3):
+        for i in range(1, len(p)):
+            p[i] = np.clip(p[i], p[i - 1] - g, p[i - 1] + g)
+        for i in range(len(p) - 2, -1, -1):
+            p[i] = np.clip(p[i], p[i + 1] - g, p[i + 1] + g)
+    return p
+
+
+for path, width, strength, max_deg in [(main, 3.2, 0.9, 13.0)] + [(sp, 2.6, 0.88, 15.0) for sp in side_paths.values()]:
     d_p, i_p, _ = path_field(path)
-    ph = ndimage.gaussian_filter1d(np.array([sample(h, x, z) for x, z in path]), 18, mode="nearest")
-    w_p = (1 - smoothstep(width, width + 7, d_p)) * strength * (d_river > hw + 2)
+    raw = np.array([sample(h, x, z) for x, z in path])
+    ph = grade_limited(ndimage.gaussian_filter1d(raw, 18, mode="nearest"), 0.3, max_deg)
+    ph = ndimage.gaussian_filter1d(ph, 10, mode="nearest")
+    delta = np.abs(ph - raw)[i_p]
+    w_p = (1 - smoothstep(width, width + 6 + 1.5 * delta, d_p)) * strength * (d_river > hw + 2)
     h = h * (1 - w_p) + ph[i_p] * w_p
 
 
