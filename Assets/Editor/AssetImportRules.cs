@@ -6,7 +6,7 @@ namespace Offroad.EditorTools
     /// <summary>Import settings for generated models and textures, so nothing needs hand-tuning.</summary>
     public class AssetImportRules : AssetPostprocessor
     {
-        public override uint GetVersion() => 6;
+        public override uint GetVersion() => 7;
 
         void OnPreprocessModel()
         {
@@ -52,6 +52,18 @@ namespace Offroad.EditorTools
                 ti.mipmapEnabled = true;
                 ti.anisoLevel = 4;
                 ti.wrapMode = TextureWrapMode.Repeat;
+                ti.maxTextureSize = 1024;
+                ti.textureCompression = TextureImporterCompression.Compressed;
+            }
+            else if (assetPath.StartsWith("Assets/Art/Textures/Scans/"))
+            {
+                // Poly Haven scan maps: albedo (sRGB), OpenGL-convention normals.
+                bool normal = assetPath.Contains("_nor");
+                ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.sRGBTexture = !normal && !assetPath.Contains("_arm");
+                ti.mipmapEnabled = true;
+                ti.anisoLevel = 2;
+                ti.wrapMode = TextureWrapMode.Clamp;
                 ti.maxTextureSize = 1024;
                 ti.textureCompression = TextureImporterCompression.Compressed;
             }

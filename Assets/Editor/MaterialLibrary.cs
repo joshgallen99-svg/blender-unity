@@ -70,8 +70,8 @@ namespace Offroad.EditorTools
             ["BarkDead"] = () => Textured("BarkDead", "BarkFir", new Color(0.78f, 0.78f, 0.8f), 0f, 0.06f),
             ["FirNeedles"] = () => Foliage("FirNeedles", "FirBranch", 0.03f, 18f),
             ["FirImpostor"] = () => Foliage("FirImpostor", "FirImpostors", 0.012f, 22f),
-            ["AspenLeaves"] = () => Foliage("AspenLeaves", "ScrubLeaves", 0.08f, 10f, new Color(1.05f, 1.3f, 0.72f)),
-            ["BushLeaves"] = () => Foliage("BushLeaves", "ScrubLeaves", 0.06f, 1.5f, new Color(0.78f, 1.12f, 0.72f)),
+            ["AspenLeaves"] = () => Foliage("AspenLeaves", "AutumnLeaves", 0.08f, 10f),          // autumn gold
+            ["BushLeaves"] = () => Foliage("BushLeaves", "AutumnShrub", 0.06f, 1.5f),             // rust-red understorey
             ["Fern"] = () => Foliage("Fern", "Fern", 0.06f, 1f),
             ["MeadowGrass"] = () => Foliage("MeadowGrass", "MeadowGrass", 0.14f, 0.8f),
             ["Wildflowers"] = () => Foliage("Wildflowers", "Wildflowers", 0.14f, 0.7f),
@@ -88,7 +88,26 @@ namespace Offroad.EditorTools
             ["Rust"] = () => Textured("Rust", "Rust", Color.white, 0.25f, 0.22f),
             ["Galvanized"] = () => Textured("Galvanized", "Galvanized", Color.white, 0.65f, 0.45f),
             ["Canvas"] = () => Textured("Canvas", "Canvas", Color.white, 0f, 0.08f, 0.5f),
+            // CC0 Poly Haven granite boulder scans (blender/props/granite_scans.py).
+            ["Scan_0"] = () => Scan(0), ["Scan_1"] = () => Scan(1), ["Scan_2"] = () => Scan(2),
+            ["Scan_3"] = () => Scan(3), ["Scan_4"] = () => Scan(4),
         };
+
+        /// <summary>A scanned boulder: its own albedo and normal map, slightly cooled to sit with the granite.</summary>
+        static Material Scan(int i)
+        {
+            var m = LoadOrCreate($"{Dir}/Scan_{i}.mat", LitShader);
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/Textures/Scans/scan_{i}_diff.jpg"));
+            var normal = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/Textures/Scans/scan_{i}_nor.jpg");
+            m.SetTexture("_BumpMap", normal);
+            if (normal) m.EnableKeyword("_NORMALMAP");
+            m.SetColor("_BaseColor", new Color(0.95f, 0.97f, 1.0f));
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Smoothness", 0.12f);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
 
         /// <summary>URP Lit with a tiling albedo + normal map (UVs are in metres, from Blender box projection).</summary>
         static Material Textured(string name, string texture, Color tint, float metallic, float smoothness, float tiling = 1f)

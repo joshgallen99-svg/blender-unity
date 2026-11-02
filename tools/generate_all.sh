@@ -13,6 +13,8 @@ PY="${1:-python3}"
 "$PY" blender/props/desert_props.py
 "$PY" blender/props/forest_props.py
 "$PY" blender/props/alpine_props.py
+"$PY" tools/art/fetch_polyhaven.py          # CC0 scans (downloads once)
+"$PY" blender/props/granite_scans.py
 "$PY" blender/landmarks/desert_landmarks.py
 "$PY" blender/landmarks/forest_landmarks.py
 "$PY" blender/landmarks/alpine_landmarks.py

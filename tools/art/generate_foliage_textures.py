@@ -1,7 +1,7 @@
 """Paint leaf/grass sprite textures for the foliage cards (RGBA, alpha-cut).
 
 Run:  python tools/art/generate_foliage_textures.py
-Writes: Assets/Art/Textures/Foliage/{ScrubLeaves,ScrubFlowering,DryGrass}.png
+Writes: Assets/Art/Textures/Foliage/{ScrubLeaves,ScrubFlowering,AutumnLeaves,AutumnShrub,DryGrass}.png
 """
 import math
 import os
@@ -43,7 +43,13 @@ def finish(img, name):
     print("wrote", name)
 
 
-def scrub(name, seed, flowers):
+# Autumn palettes (colour, weight): aspen/larch gold with amber; shrubs from rust to crimson.
+AUTUMN_GOLD = [((0.86, 0.66, 0.16), 5), ((0.93, 0.78, 0.24), 4), ((0.80, 0.48, 0.10), 2), ((0.62, 0.62, 0.20), 1),
+               ((0.72, 0.22, 0.08), 0.4)]
+AUTUMN_SHRUB = [((0.66, 0.20, 0.08), 4), ((0.80, 0.34, 0.08), 3), ((0.50, 0.12, 0.10), 2), ((0.86, 0.60, 0.16), 1)]
+
+
+def scrub(name, seed, flowers, palette=None):
     rng = np.random.default_rng(seed)
     W = S * SS
     img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
@@ -65,7 +71,12 @@ def scrub(name, seed, flowers):
         cx = x0 + (x1 - x0) * t + rng.normal(0, 14 * SS)
         cy = y0 + (y1 - y0) * t + rng.normal(0, 14 * SS)
         shade = 0.75 + 0.45 * (1 - cy / W) + rng.normal(0, 0.06)
-        col = np.clip(base * shade + rng.normal(0, 0.03, 3), 0, 1) * 255
+        if palette:
+            w = np.array([p[1] for p in palette], float)
+            leaf = np.array(palette[rng.choice(len(palette), p=w / w.sum())][0])
+        else:
+            leaf = base
+        col = np.clip(leaf * shade + rng.normal(0, 0.03, 3), 0, 1) * 255
         d.polygon(leaf_poly(cx, cy, rng.uniform(18, 30) * SS, rng.uniform(4, 7) * SS, rng.uniform(0, math.pi)),
                   fill=tuple(int(c) for c in col) + (255,))
     if flowers:
@@ -108,4 +119,6 @@ def grass(name, seed):
 
 scrub("ScrubLeaves.png", 1, flowers=False)
 scrub("ScrubFlowering.png", 2, flowers=True)
+scrub("AutumnLeaves.png", 4, flowers=False, palette=AUTUMN_GOLD)
+scrub("AutumnShrub.png", 5, flowers=False, palette=AUTUMN_SHRUB)
 grass("DryGrass.png", 3)
