@@ -96,6 +96,8 @@ namespace Offroad.CameraRig
 
         Offroad.Vehicles.OffroadVehicle _vehicle;
 
+        float _roll;
+
         void LateUpdate()
         {
             if (!target) return;
@@ -177,6 +179,19 @@ namespace Offroad.CameraRig
                 float amp = 0.035f * _vehicle.Rattle * (1f - _showcaseBlend);
                 pos += new Vector3(Mathf.PerlinNoise(tt, 0.3f) - 0.5f, Mathf.PerlinNoise(0.7f, tt) - 0.5f, 0f) * (2f * amp);
             }
+            // Off-camber: lean the horizon with part of the vehicle's roll, and shudder near the tipping point.
+            if (_vehicle != null && Time.timeScale > 0f)
+            {
+                float roll = Vector3.SignedAngle(Vector3.ProjectOnPlane(Vector3.up, t.forward), t.up, t.forward);
+                _roll = Mathf.Lerp(_roll, Mathf.Clamp(roll, -40f, 40f) * 0.3f * (1f - _showcaseBlend), 1f - Mathf.Exp(-4f * dt));
+                float shudder = Mathf.Clamp01((_vehicle.TipRisk - 0.75f) / 0.25f) * (1f - _showcaseBlend);
+                if (shudder > 0f)
+                {
+                    float tt = Time.time * 17f;
+                    pos += new Vector3(Mathf.PerlinNoise(tt, 1.3f) - 0.5f, Mathf.PerlinNoise(2.1f, tt) - 0.5f, 0f) * (0.06f * shudder);
+                }
+            }
+            lookRot = lookRot * Quaternion.Euler(0f, 0f, _roll);
             // Never below the ground (photo-mode orbits pitched low on a slope could dip under the terrain).
             var terrain = Terrain.activeTerrain;
             if (terrain)

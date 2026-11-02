@@ -86,6 +86,8 @@ namespace Offroad.Vehicles
                 var fx = GetOrAdd<VehicleEffects>(root);
                 fx.dustMaterial = parts.dustMaterial;
             }
+            if (Application.isPlaying || parts != null) GetOrAdd<VehicleAudio>(root);
+            GetOrAdd<Winch>(root);
 
             root.SetActive(wasActive);
             return vehicle;
