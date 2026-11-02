@@ -177,6 +177,13 @@ namespace Offroad.CameraRig
                 float amp = 0.035f * _vehicle.Rattle * (1f - _showcaseBlend);
                 pos += new Vector3(Mathf.PerlinNoise(tt, 0.3f) - 0.5f, Mathf.PerlinNoise(0.7f, tt) - 0.5f, 0f) * (2f * amp);
             }
+            // Never below the ground (photo-mode orbits pitched low on a slope could dip under the terrain).
+            var terrain = Terrain.activeTerrain;
+            if (terrain)
+            {
+                float floor = terrain.SampleHeight(pos) + terrain.transform.position.y + 0.5f;
+                if (pos.y < floor) pos.y = floor;
+            }
             transform.position = pos;
             transform.rotation = lookRot;
 
