@@ -30,6 +30,7 @@ def palette():
     m = C.material
     return {
         "AlpineRock": m("AlpineRock", (0.25, 0.25, 0.26), 0.0, 0.85),
+        "HutStone": m("HutStone", (0.30, 0.30, 0.30), 0.0, 0.85),
         "RoofRed": m("RoofRed", (0.32, 0.05, 0.035), 0.3, 0.55),
         "Wood": m("Wood", (0.45, 0.39, 0.32), 0.0, 0.85),
         "WoodDark": m("WoodDark", (0.25, 0.20, 0.16), 0.0, 0.9),
@@ -85,8 +86,8 @@ def gable_roof(M, W, D, eave_z, ridge_z, over, thick, mat):
 
 def stone_hut(M):
     W, D, Hh = 8.0, 6.0, 2.9
-    parts = [C.box("plinth", (W + 0.6, D + 0.6, 0.6), (0, 0, 0.0), M["AlpineRock"], 0.1)]
-    parts.append(C.box("walls", (W, D, Hh), (0, 0, Hh / 2 + 0.2), M["AlpineRock"], 0.12))
+    parts = [C.box("plinth", (W + 0.6, D + 0.6, 0.6), (0, 0, 0.0), M["HutStone"], 0.1)]
+    parts.append(C.box("walls", (W, D, Hh), (0, 0, Hh / 2 + 0.2), M["HutStone"], 0.12))
     ridge = Hh + 0.2 + 2.3
     # Stone gables.
     for s in (-1, 1):
@@ -94,10 +95,10 @@ def stone_hut(M):
         tri_b = [(-W / 2, y, Hh + 0.2), (W / 2, y, Hh + 0.2), (0.1, y, ridge - 0.1), (-0.1, y, ridge - 0.1)]
         a = [(x, y - 0.3 * s, z) for x, _, z in tri_b]
         b = [(x, y, z) for x, _, z in tri_b]
-        parts.append(C.hull("gable", a if s > 0 else b, b if s > 0 else a, M["AlpineRock"]))
+        parts.append(C.hull("gable", a if s > 0 else b, b if s > 0 else a, M["HutStone"]))
     parts += gable_roof(M, W, D, Hh + 0.0, ridge, 0.55, 0.12, M["RoofRed"])
     parts.append(C.box("ridgecap", (0.3, D + 1.1, 0.14), (0, 0, ridge + 0.1), M["RoofRed"], 0.02))
-    parts.append(C.box("chimney", (0.8, 0.8, 2.2), (W / 2 - 1.4, 1.2, ridge - 0.3), M["AlpineRock"], 0.06))
+    parts.append(C.box("chimney", (0.8, 0.8, 2.2), (W / 2 - 1.4, 1.2, ridge - 0.3), M["HutStone"], 0.06))
     parts.append(C.box("chimcap", (1.0, 1.0, 0.12), (W / 2 - 1.4, 1.2, ridge + 0.85), M["Steel"], 0.02))
     # Front: door, two shuttered windows, bench; a side window.
     fy = -D / 2
@@ -126,7 +127,7 @@ def cairn(M):
     while r > 0.16:
         t = r * rnd.uniform(0.38, 0.5)
         parts.append(stone(f"c{k}", 20 + k, (r, r * rnd.uniform(0.8, 1.0), t), (rnd.uniform(-0.06, 0.06), rnd.uniform(-0.06, 0.06), z + t * 0.6),
-                           M["AlpineRock"], 2))
+                           M["HutStone"], 2))
         z += t * 1.25
         r *= rnd.uniform(0.78, 0.88)
         k += 1
@@ -141,7 +142,7 @@ def summit_sign(M):
     parts.append(C.box("register", (0.32, 0.22, 0.26), (0, -0.2, 1.05), M["Galvanized"], 0.02))
     for k in range(5):
         a = k * 2 * math.pi / 5
-        parts.append(stone(f"s{k}", 40 + k, (0.35, 0.3, 0.2), (math.cos(a) * 0.32, math.sin(a) * 0.32, 0.05), M["AlpineRock"], 1))
+        parts.append(stone(f"s{k}", 40 + k, (0.35, 0.3, 0.2), (math.cos(a) * 0.32, math.sin(a) * 0.32, 0.05), M["HutStone"], 1))
     obj = C.join(parts, "SummitSign")
     return finish(obj, 35, 0.6)
 

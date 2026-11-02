@@ -58,7 +58,14 @@ def gl_normal(name, flat=1.0, size=T):
     return n / np.linalg.norm(n, axis=-1, keepdims=True)
 
 
+# Target mean brightness (sRGB) per texture, so the region sits in the same exposure range as the
+# others: snow a little under paper-white, rock and turf mid-dark, like the forest's granite and meadow.
+TARGET = {"Snow": 0.81, "Scree": 0.45, "AlpineGrass": 0.42, "AlpineRock": 0.44, "AlpineTrack": 0.45}
+
+
 def save(name, albedo, height, normal):
+    if name in TARGET:
+        albedo = albedo * (TARGET[name] / max(float(np.clip(albedo, 0, 1).mean()), 1e-3))
     h = norm01(height)
     rgba = np.concatenate([np.clip(albedo, 0, 1), h[..., None]], -1)
     Image.fromarray((rgba * 255).round().astype(np.uint8), "RGBA").save(os.path.join(TERRAIN, f"{name}_albedo.png"))
@@ -96,15 +103,15 @@ rock_detail = rock_detail / rock_detail.mean()
 
 # ---------------------------------------------------------------- snow (tile 5 m)
 lumps = tile_noise(T, 3.6, 301)
-ripples = tile_noise(T, 3.0, 302, stretch=(0.25, 1.6))              # sastrugi: long ridges across the wind
+ripples = tile_noise(T, 3.0, 302, stretch=(0.45, 1.3))              # sastrugi: soft ridges across the wind
 grain = tile_noise(T, 1.2, 303)
-sh = lumps * 0.55 + ripples * 0.4 + grain * 0.05
+sh = lumps * 0.7 + ripples * 0.24 + grain * 0.06
 low = 1 - norm01(blur(sh, 6))
 snow = np.array([0.90, 0.93, 0.97]) * (0.94 + 0.06 * sh[..., None])
 snow = snow * (1 - 0.06 * low[..., None]) + np.array([-0.03, -0.01, 0.02]) * low[..., None]   # bluer hollows
 specks = (tile_noise(T, 0.8, 304) > 0.83) * (tile_noise(T, 2.5, 305) > 0.6)                    # old snow: faint grit
 snow = snow * (1 - 0.06 * blur(specks.astype(float), 0.7)[..., None])
-save("Snow", snow, sh, normal_from_height(blur(sh, 1.0), 14.0))
+save("Snow", snow, sh, normal_from_height(blur(sh, 1.5), 7.0))
 
 # ---------------------------------------------------------------- scree (tile 3 m)
 ys, xs = np.mgrid[0:T, 0:T].astype(np.float64)

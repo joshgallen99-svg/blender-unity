@@ -213,7 +213,7 @@ namespace Offroad.Game
                 Vector3 q = c + Quaternion.Euler(0f, k * 23f, 0f) * dir * (dist + (k / 4) * 6f) + Vector3.up * 60f;
                 if (!Physics.Raycast(q, Vector3.down, out var hit, 250f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                     continue;
-                bool ground = hit.collider is TerrainCollider && hit.normal.y > 0.85f;
+                bool ground = hit.collider is TerrainCollider && hit.normal.y > 0.85f && !UnderWater(hit.point);
                 bool clear = !Physics.CheckBox(hit.point + Vector3.up * 1.4f, new Vector3(1.6f, 1.0f, 2.8f),
                     Quaternion.identity, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
                 if (ground && clear) { p = hit.point + Vector3.up * 1.2f; break; }
@@ -223,6 +223,17 @@ namespace Offroad.Game
             look.y = 0f;
             vehicle.Teleport(p, Quaternion.LookRotation(look.normalized, Vector3.up));
             cam?.SnapBehindTarget();
+        }
+
+        /// <summary>True where the terrain's hazard map says the ground is under water (lakes, rivers).</summary>
+        static bool UnderWater(Vector3 point)
+        {
+            var t = Terrain.activeTerrain;
+            var surfaces = t ? t.GetComponent<World.TerrainSurfaces>() : null;
+            if (surfaces == null || !surfaces.greenIsWater) return false;
+            var size = t.terrainData.size;
+            Vector3 local = point - t.transform.position;
+            return surfaces.HazardAt(local.x / size.x, local.z / size.z).g > 0.04f;
         }
 
         void ResetVehicle()

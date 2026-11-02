@@ -77,9 +77,10 @@ namespace Offroad.EditorTools
             ["Wildflowers"] = () => Foliage("Wildflowers", "Wildflowers", 0.14f, 0.7f),
             ["Granite"] = () => ForestRock(),
             // Alpine pass.
-            ["AlpineRock"] = () => AlpineRock(),
-            ["TundraGrass"] = () => Foliage("TundraGrass", "MeadowGrass", 0.16f, 0.6f, new Color(1.3f, 1.08f, 0.62f)),
-            ["AlpineFlowers"] = () => Foliage("AlpineFlowers", "Wildflowers", 0.12f, 0.45f, new Color(1.05f, 0.95f, 1.0f)),
+            ["AlpineRock"] = () => AlpineRock("AlpineRock", true),
+            ["TundraGrass"] = () => Foliage("TundraGrass", "MeadowGrass", 0.16f, 0.6f, new Color(0.88f, 0.84f, 0.62f)),
+            ["AlpineFlowers"] = () => Foliage("AlpineFlowers", "Wildflowers", 0.12f, 0.45f, new Color(0.82f, 0.8f, 0.86f)),
+            ["HutStone"] = () => AlpineRock("HutStone", false),
             ["LeavesFlowering"] = () => Foliage("LeavesFlowering", "ScrubFlowering", 0.07f, 1.3f),
             ["GrassCards"] = () => Foliage("GrassCards", "DryGrass", 0.14f, 0.7f),
             ["Wood"] = () => Textured("Wood", "Wood", Color.white, 0f, 0.12f),
@@ -174,9 +175,9 @@ namespace Offroad.EditorTools
         }
 
         /// <summary>Alpine gneiss: triplanar dark rock, lichen, tundra turf on low ledges and snow on high ones.</summary>
-        static Material AlpineRock()
+        static Material AlpineRock(string name, bool snow)
         {
-            var m = LoadOrCreate($"{Dir}/AlpineRock.mat", "Offroad/ForestRock");
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/ForestRock");
             m.SetTexture("_BaseMap", Tex("AlpineRock_albedo"));
             m.SetTexture("_BumpMap", Tex("AlpineRock_normal"));
             m.SetTexture("_TopMap", Tex("AlpineGrass_albedo"));
@@ -190,7 +191,7 @@ namespace Offroad.EditorTools
             m.SetFloat("_TopSharpness", 4f);
             m.SetFloat("_SkirtHeight", 0.6f);
             m.SetFloat("_Smoothness", 0.12f);
-            m.SetVector("_SnowHeight", new Vector4(225f, 285f, 0f, 0f));
+            m.SetVector("_SnowHeight", snow ? new Vector4(225f, 285f, 0f, 0f) : new Vector4(100000f, 100001f, 0f, 0f));
             m.SetFloat("_SnowAmount", 0.62f);
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);

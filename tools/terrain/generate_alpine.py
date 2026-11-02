@@ -305,13 +305,6 @@ for zi, xi in cand:
     yaw = math.degrees(math.atan2(gx0[zi, xi], gz0[zi, xi]))     # long axis across the slope
     add_formation(["Ridge_0", "Ridge_1", "Ridge_2"][placed % 3], x, z, yaw + 90, rng.uniform(0.85, 1.35), 5.0)
     placed += 1
-for k in range(16):                                              # glacial erratics on the valley floor
-    for _ in range(100):
-        x, z = rng.uniform(80, SIZE - 80, 2)
-        if (sample(d_valley, x, z) < 140 and sample(slope0, x, z) < 14 and sample(water_depth, x, z) <= 0
-                and sample(d_ramp, x, z) > 30 and all(math.hypot(x - f["x"], z - f["z"]) > 50 for f in formations)):
-            add_formation(["Erratic_0", "Erratic_1"][k % 2], x, z, rng.uniform(0, 360), rng.uniform(0.8, 1.4), 0.8)
-            break
 
 
 def footprint_r(f, x=None, z=None):
@@ -368,6 +361,19 @@ d_side = np.full((N, N), 1e4)
 for sp in side_paths.values():
     d_side = np.minimum(d_side, path_field(sp)[0])
 d_track = np.minimum(d_main, d_side)
+
+# Glacial erratics on the valley floor, clear of the tracks.
+for k in range(16):
+    for _ in range(100):
+        x, z = rng.uniform(80, SIZE - 80, 2)
+        if (sample(d_valley, x, z) < 140 and sample(slope0, x, z) < 14 and sample(water_depth, x, z) <= 0
+                and sample(d_track, x, z) > 16 and sample(d_ramp, x, z) > 30
+                and all(math.hypot(x - f["x"], z - f["z"]) > 50 for f in formations)):
+            add_formation(["Erratic_0", "Erratic_1"][k % 2], x, z, rng.uniform(0, 360), rng.uniform(0.8, 1.4), 0.8)
+            break
+foot_r = np.full((N, N), 9.0)
+for f in formations:
+    foot_r = np.minimum(foot_r, footprint_r(f))
 
 # Grade the tracks: the profile is smoothed and its gradient capped (cut into rises, built up over
 # dips), then the terrain is benched to it, with banks that widen with the depth of the cut or fill.
