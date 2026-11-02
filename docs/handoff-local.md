@@ -99,6 +99,10 @@ The owner played the build and called it "decent, but really unplayable". In pri
    - Free Megascans/Fab content, if the owner adds it through their own account.
 8. **General polish** everywhere: UI, menus, transitions.
 
+## Owner's own words
+
+The full, verbatim playtest notes are in `docs/owner-feedback.md`. The owner is adding reference images separately.
+
 ## How to work
 
 - Use real feedback. Run the game in the editor on the Mac and capture screenshots, e.g. a small
