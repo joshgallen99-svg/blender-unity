@@ -124,7 +124,7 @@ namespace Offroad.EditorTools
             sun.color = P.sunColor;
             sun.intensity = P.sunIntensity;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.9f;
+            sun.shadowStrength = P.shadowStrength;
             go.transform.rotation = Quaternion.Euler(P.sunEuler);
 
             // Custom sky: its horizon haze is the fog colour, so distant land melts into it.
@@ -578,8 +578,12 @@ namespace Offroad.EditorTools
                         float a = k * Mathf.PI * 2f / Seg;
                         var off = rot * new Vector3(Mathf.Cos(a) * (l.rx + 8f) * t, 0f, Mathf.Sin(a) * (l.rz + 8f) * t);
                         var q = new Vector3(l.x, l.level + ty, l.z) + off;
-                        float foam = info.falls != null ? Mathf.Clamp01(1f - Vector2.Distance(new Vector2(q.x, q.z), new Vector2(fallsPos.x, fallsPos.z)) / 22f) : 0f;
-                        mb.Add(q, Vector3.up, new Vector4(1f, 0f, 0f, 1f), new Vector2(q.x, q.z), new Color(0.15f, foam * 0.8f, 0f, 0.08f));
+                        // A churning foam ring where the falls hit the lake, spreading out and thinning.
+                        float dFalls = info.falls != null ? Vector2.Distance(new Vector2(q.x, q.z), new Vector2(fallsPos.x, fallsPos.z - 4f)) : 999f;
+                        float foam = Mathf.Clamp01(1.25f - dFalls / 24f);
+                        float churn = Mathf.Clamp01(1f - dFalls / 30f);
+                        mb.Add(q, Vector3.up, new Vector4(1f, 0f, 0f, 1f), new Vector2(q.x, q.z),
+                               new Color(0.15f + 0.85f * churn, foam, 0f, 0.08f + 0.5f * churn));
                     }
                 }
                 for (int ring = 0; ring < Rings; ring++)
@@ -598,47 +602,51 @@ namespace Offroad.EditorTools
                 float baseY = terrain.SampleHeight(fallsPos) + ty - 3f;   // the cliff formation's base (sink 3 m)
                 float top = baseY + 18.4f;                               // floor of its notch
                 float bottom = l.level + ty - 0.3f;
-                var mb = new MeshBits();
-                const int Rows = 12, Cols = 5;
-                float h = Mathf.Max(top - bottom, 1f);
-                for (int j = 0; j <= Rows; j++)
+                // Two layers: the main sheet against the rock, and a thinner, faster veil a little in front of it.
+                foreach (var (name, front, opacity, flow) in new[] { ("Waterfall", 0f, 1f, 1f), ("Waterfall Veil", 0.9f, 0.5f, 1.35f) })
                 {
-                    float t = j / (float)Rows;
-                    float y = Mathf.Lerp(top, bottom, t);
-                    float zOff = -0.8f - 3.2f * Mathf.Sqrt(t);           // arcs out from the face (the lake is to the south)
-                    float half = Mathf.Lerp(3.6f, 5.2f, t);
-                    for (int c = 0; c <= Cols; c++)
+                    var mb = new MeshBits();
+                    const int Rows = 14, Cols = 8;
+                    float h = Mathf.Max(top - bottom, 1f);
+                    for (int j = 0; j <= Rows; j++)
                     {
-                        float u = Mathf.Lerp(-half, half, c / (float)Cols);
-                        var q = new Vector3(fallsPos.x + u, y, fallsPos.z + zOff);
-                        mb.Add(q, Vector3.back, new Vector4(1f, 0f, 0f, 1f), new Vector2(u, t * h), new Color(1f, 1f, 1f, 1f));
-                    }
-                    if (j > 0)
-                        for (int c = 0; c < Cols; c++)
+                        float t = j / (float)Rows;
+                        float y = Mathf.Lerp(top, bottom, t);
+                        float zOff = -0.8f - front - 3.6f * Mathf.Sqrt(t);   // arcs out from the face (the lake is to the south)
+                        float half = Mathf.Lerp(4.6f, 6.8f, t) + front * 0.4f;
+                        for (int c = 0; c <= Cols; c++)
                         {
-                            int a0 = (j - 1) * (Cols + 1) + c, a1 = a0 + 1, b0 = a0 + Cols + 1, b1 = b0 + 1;
-                            mb.Tri(a0, a1, b1);
-                            mb.Tri(a0, b1, b0);
+                            float u = Mathf.Lerp(-half, half, c / (float)Cols);
+                            var q = new Vector3(fallsPos.x + u, y, fallsPos.z + zOff);
+                            mb.Add(q, Vector3.back, new Vector4(1f, 0f, 0f, 1f), new Vector2(u, t * h), new Color(1f, opacity, 1f, flow));
                         }
+                        if (j > 0)
+                            for (int c = 0; c < Cols; c++)
+                            {
+                                int a0 = (j - 1) * (Cols + 1) + c, a1 = a0 + 1, b0 = a0 + Cols + 1, b1 = b0 + 1;
+                                mb.Tri(a0, a1, b1);
+                                mb.Tri(a0, b1, b0);
+                            }
+                    }
+                    Place(root, mb.Build(name), mat);
                 }
-                Place(root, mb.Build("Waterfall"), mat);
 
                 var mistGo = new GameObject("Falls Mist");
                 mistGo.transform.SetParent(root, false);
                 mistGo.transform.position = new Vector3(fallsPos.x, bottom + 0.5f, fallsPos.z - 5f);
                 var ps = mistGo.AddComponent<ParticleSystem>();
                 var main = ps.main;
-                main.startLifetime = 6f;
-                main.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1.2f);
-                main.startSize = new ParticleSystem.MinMaxCurve(4f, 9f);
-                main.startColor = new Color(0.92f, 0.95f, 1f, 0.22f);
-                main.maxParticles = 80;
+                main.startLifetime = 7f;
+                main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 1.6f);
+                main.startSize = new ParticleSystem.MinMaxCurve(6f, 14f);
+                main.startColor = new Color(0.94f, 0.96f, 1f, 0.3f);
+                main.maxParticles = 140;
                 main.simulationSpace = ParticleSystemSimulationSpace.World;
                 var em = ps.emission;
-                em.rateOverTime = 9f;
+                em.rateOverTime = 16f;
                 var shape = ps.shape;
                 shape.shapeType = ParticleSystemShapeType.Box;
-                shape.scale = new Vector3(9f, 1f, 3f);
+                shape.scale = new Vector3(14f, 1f, 5f);
                 var col = ps.colorOverLifetime;
                 col.enabled = true;
                 var grad = new Gradient();
@@ -964,6 +972,10 @@ namespace Offroad.EditorTools
             atmosphere.saturation = P.saturation;
             atmosphere.temperature = P.temperature;
             atmosphere.sunFogColor = P.sunGlow;
+            atmosphere.postExposure = P.postExposure;
+            atmosphere.shaftTint = P.sunGlow;
+            atmosphere.shaftIntensity = P.shaftIntensity;
+            atmosphere.shaftThreshold = P.shaftThreshold;
             go.AddComponent<DiscoveryTracker>().player = vehicle.transform;
             var trails = go.AddComponent<GroundTrails>();     // tyre tracks pressed into soft ground
             trails.stampShader = Shader.Find("Hidden/Offroad/TrailStamp");

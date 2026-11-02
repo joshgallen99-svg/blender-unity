@@ -22,6 +22,8 @@ namespace Offroad.EditorTools
         {
             var pipeline = EnsurePipeline();
             ConfigurePipeline(pipeline);
+            var rendererData = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(RendererPath);
+            if (rendererData != null) EnsureSunShafts(rendererData);
 
             GraphicsSettings.defaultRenderPipeline = pipeline;
             int current = QualitySettings.GetQualityLevel();
@@ -85,6 +87,37 @@ namespace Offroad.EditorTools
             var data = ScriptableObject.CreateInstance<UniversalRendererData>();
             AssetDatabase.CreateAsset(data, RendererPath);
             return data;
+        }
+
+        /// <summary>Adds the light-rays renderer feature to the renderer (once), keeping URP's feature map in sync.</summary>
+        static void EnsureSunShafts(UniversalRendererData data)
+        {
+            var shader = Shader.Find("Hidden/Offroad/SunShafts");
+            foreach (var f in data.rendererFeatures)
+                if (f is Offroad.Rendering.SunShaftsFeature existing)
+                {
+                    existing.shader = shader;
+                    EditorUtility.SetDirty(existing);
+                    return;
+                }
+            var feature = ScriptableObject.CreateInstance<Offroad.Rendering.SunShaftsFeature>();
+            feature.name = "Sun Shafts";
+            feature.shader = shader;
+            AssetDatabase.AddObjectToAsset(feature, data);
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out string _, out long localId);
+            var so = new SerializedObject(data);
+            var list = so.FindProperty("m_RendererFeatures");
+            var map = so.FindProperty("m_RendererFeatureMap");
+            list.arraySize++;
+            list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = feature;
+            if (map != null)
+            {
+                map.arraySize++;
+                map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(data);
+            AssetDatabase.SaveAssets();
         }
 
         static void ConfigurePipeline(UniversalRenderPipelineAsset a)

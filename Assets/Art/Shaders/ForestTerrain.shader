@@ -214,7 +214,7 @@ Shader "Offroad/ForestTerrain"
                 s.albedo = albedo;
                 s.smoothness = smooth;
                 s.normalTS = half3(0, 0, 1);
-                s.occlusion = lerp(0.6, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.5));
+                s.occlusion = lerp(0.8, 1.0, saturate(lerp(groundH, rockTex.a, rb) * 1.5));
                 s.alpha = 1;
 
                 InputData d = (InputData)0;

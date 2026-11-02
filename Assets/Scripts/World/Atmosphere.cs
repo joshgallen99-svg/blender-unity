@@ -30,6 +30,12 @@ namespace Offroad.World
         public Color sunFogColor = new Color(1f, 0.74f, 0.5f);
         [Range(0, 1)] public float sunFogStrength = 0.7f;
 
+        [Header("Light rays")]
+        public Color shaftTint = new Color(1f, 0.86f, 0.66f);
+        [Range(0, 2)] public float shaftIntensity = 0.55f;
+        [Tooltip("Only pixels brighter than this (HDR) around the sun make rays.")]
+        public float shaftThreshold = 1.1f;
+
         [Header("Reflections")]
         public int reflectionResolution = 128;
 
@@ -41,6 +47,9 @@ namespace Offroad.World
         void Awake()
         {
             Shader.SetGlobalVector(SunFogId, new Vector4(sunFogColor.r, sunFogColor.g, sunFogColor.b, sunFogStrength));
+            Offroad.Rendering.SunShafts.Tint = shaftTint;
+            Offroad.Rendering.SunShafts.Intensity = shaftIntensity;
+            Offroad.Rendering.SunShafts.Threshold = shaftThreshold;
             BuildVolume();
             BuildReflectionProbe();
         }
@@ -119,6 +128,7 @@ namespace Offroad.World
         void OnSettingsChanged(SettingsData s)
         {
             if (_volume) _volume.enabled = s.postEffects;
+            Offroad.Rendering.SunShafts.Enabled = s.postEffects && s.preset != QualityPreset.BatterySaver;
             VehicleEffects.GlobalDustScale = s.preset == QualityPreset.BatterySaver ? 0.5f : 1f;
         }
     }

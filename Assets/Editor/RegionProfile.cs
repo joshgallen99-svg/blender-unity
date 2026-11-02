@@ -60,6 +60,9 @@ namespace Offroad.EditorTools
         public float contrast, saturation, temperature;
         public float cloudCoverage;
         public Color zenith, horizon, sunGlow;     // sky; its horizon haze is fogColor
+        public float shadowStrength = 0.9f;        // lower = more skylight in the shade
+        public float postExposure = 0.08f;
+        public float shaftIntensity = 0.55f, shaftThreshold = 1.1f;
     }
 
     public static class RegionProfiles
@@ -131,8 +134,8 @@ namespace Offroad.EditorTools
                 ["Stump"] = new PropKind { cullHeight = 0.01f, shadows = true, collider = 2, alignToGround = 0.3f },
             },
             sunEuler = new Vector3(27f, 300f, 0f), sunColor = new Color(1f, 0.88f, 0.72f), sunIntensity = 2.5f,
-            ambientSky = new Color(0.50f, 0.59f, 0.72f), ambientEquator = new Color(0.48f, 0.53f, 0.46f),
-            ambientGround = new Color(0.29f, 0.30f, 0.22f), fogColor = new Color(0.70f, 0.76f, 0.82f),
+            ambientSky = new Color(0.56f, 0.64f, 0.76f), ambientEquator = new Color(0.55f, 0.59f, 0.51f),
+            ambientGround = new Color(0.34f, 0.35f, 0.27f), fogColor = new Color(0.70f, 0.76f, 0.82f),
             zenith = new Color(0.17f, 0.33f, 0.62f), horizon = new Color(0.63f, 0.72f, 0.83f), sunGlow = new Color(1f, 0.9f, 0.74f),
             skyTint = new Color(0.42f, 0.52f, 0.66f), atmosphereThickness = 1.0f, skyExposure = 1.15f,
             farLit = new Color(0.66f, 0.72f, 0.82f), farShadow = new Color(0.34f, 0.42f, 0.55f), farHaze = new Color(0.70f, 0.76f, 0.82f),
@@ -141,6 +144,8 @@ namespace Offroad.EditorTools
             midHazeAmount = 0.5f, midHazeHeight = 220f,
             contrast = 14f, saturation = 4f, temperature = -3f,
             cloudCoverage = 0.5f,
+            // Shade under the canopy: lighter shadows, more fill, a touch more exposure; strong light rays.
+            shadowStrength = 0.68f, postExposure = 0.22f, shaftIntensity = 0.75f, shaftThreshold = 0.95f,
         };
 
         public static readonly RegionProfile[] All = { Desert, Forest };

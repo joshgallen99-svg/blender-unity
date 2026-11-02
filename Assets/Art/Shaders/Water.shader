@@ -121,10 +121,26 @@ Shader "Offroad/Water"
                 half fresnel = pow(1.0 - saturate(dot(normalWS, viewWS)), 5.0) * 0.9 + 0.03;
                 half alpha = saturate(max(absorb, fresnel * 0.55) + foam);
                 alpha *= saturate(depth * 12.0 + fall);                     // feather the shoreline
+                half3 albedo = lerp(waterCol, half3(0.85, 0.88, 0.88), foam);
+                half smooth = lerp(0.86, 0.35, foam);
+
+                [branch] if (fall > 0.5)
+                {
+                    // Falling water: aerated and nearly white, in two streams split by a rock in the notch,
+                    // with long vertical streaks racing down. Vertex green = layer opacity (back sheet / veil).
+                    float2 uvS = float2(uv.x * 2.4, (uv.y - tm * speed * 1.4) * 0.3) / _FoamScale;
+                    half streak = SAMPLE_TEXTURE2D(_FoamTex, sampler_FoamTex, uvS).r;
+                    half streak2 = SAMPLE_TEXTURE2D(_FoamTex, sampler_FoamTex, uvS * float2(0.55, 0.8) + 0.31).r;
+                    half streams = saturate(1.8 - abs(abs(uv.x) - 2.6) / 1.25);
+                    half body = saturate(streams * (0.5 + 0.7 * streak + 0.45 * streak2));
+                    albedo = lerp(half3(0.58, 0.67, 0.69), half3(0.95, 0.97, 0.97), saturate(0.35 + streak + streak2 * 0.6));
+                    smooth = 0.55;
+                    alpha = saturate(body) * i.color.g;
+                }
 
                 SurfaceData s = (SurfaceData)0;
-                s.albedo = lerp(waterCol, half3(0.85, 0.88, 0.88), foam);
-                s.smoothness = lerp(0.86, 0.35, foam);
+                s.albedo = albedo;
+                s.smoothness = smooth;
                 s.normalTS = half3(0, 0, 1);
                 s.occlusion = 1;
                 s.alpha = alpha;
