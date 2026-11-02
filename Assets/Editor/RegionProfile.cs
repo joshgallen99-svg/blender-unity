@@ -184,18 +184,19 @@ namespace Offroad.EditorTools
             // Crisp high-altitude light: a whiter sun, deep blue zenith, cool shade, thin haze.
             // Sun from the west-south-west: looking up the valley, slopes are side-lit from the left.
             sunEuler = new Vector3(36f, 62f, 0f), sunColor = new Color(1f, 0.94f, 0.84f), sunIntensity = 2.6f,
-            ambientSky = new Color(0.55f, 0.67f, 0.86f), ambientEquator = new Color(0.62f, 0.66f, 0.70f),
-            ambientGround = new Color(0.42f, 0.42f, 0.38f), fogColor = new Color(0.72f, 0.79f, 0.88f),
+            // Strong skylight: cliffs facing away from the sun stay blue-grey, never black.
+            ambientSky = new Color(0.68f, 0.80f, 1.0f), ambientEquator = new Color(0.76f, 0.79f, 0.83f),
+            ambientGround = new Color(0.52f, 0.50f, 0.46f), fogColor = new Color(0.72f, 0.79f, 0.88f),
             zenith = new Color(0.10f, 0.25f, 0.56f), horizon = new Color(0.60f, 0.71f, 0.86f), sunGlow = new Color(1f, 0.92f, 0.78f),
             skyTint = new Color(0.40f, 0.52f, 0.72f), atmosphereThickness = 0.8f, skyExposure = 1.2f,
             farLit = new Color(0.72f, 0.77f, 0.86f), farShadow = new Color(0.38f, 0.46f, 0.60f), farHaze = new Color(0.72f, 0.79f, 0.88f),
             farHazeAmount = 0.45f, farHazeHeight = 700f, farSnowLine = 0.5f,
-            midLit = new Color(0.46f, 0.47f, 0.50f), midShadow = new Color(0.22f, 0.26f, 0.33f), midHaze = new Color(0.72f, 0.79f, 0.88f),
-            midHazeAmount = 0.4f, midHazeHeight = 300f,
+            midLit = new Color(0.58f, 0.60f, 0.66f), midShadow = new Color(0.40f, 0.46f, 0.56f), midHaze = new Color(0.72f, 0.79f, 0.88f),
+            midHazeAmount = 0.55f, midHazeHeight = 300f,
             contrast = 14f, saturation = 6f, temperature = -2f,
             cloudCoverage = 0.42f,
             shadowStrength = 0.72f, postExposure = 0.05f, shaftIntensity = 0.6f, shaftThreshold = 1.05f,
-            backdropScale = 1.9f, midBackdropScale = 2.6f, midSnowLine = 300f, midJagged = true,
+            backdropScale = 1.9f, midBackdropScale = 2.2f, midSnowLine = 240f, midJagged = true,
             // Glacial flour: milky turquoise, nearly opaque beyond the shallows.
             waterShallow = new Color(0.30f, 0.62f, 0.60f), waterDeep = new Color(0.06f, 0.38f, 0.44f), waterClarity = 1.4f,
             fogStart = 260f, fogEnd = 1300f,
