@@ -57,7 +57,7 @@ namespace Offroad.Vehicles
             _tip = Mathf.Clamp01((_vehicle.TipRisk - 0.6f) / 0.35f);
             _creak = Mathf.Clamp01((_vehicle.TipRisk - 0.45f) / 0.4f) * Mathf.Clamp01(_vehicle.Body.angularVelocity.magnitude * 2f + 0.3f);
             bool paused = Time.timeScale <= 0f || AudioListener.pause;
-            _source.volume = paused ? 0f : volume;
+            _source.volume = paused || Application.isBatchMode ? 0f : volume;   // silent in headless test runs
         }
 
         float Noise()

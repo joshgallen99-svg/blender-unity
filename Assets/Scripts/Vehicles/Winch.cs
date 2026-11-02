@@ -25,7 +25,7 @@ namespace Offroad.Vehicles
         public bool PortableAnchor { get; private set; }
         public float Tension { get; private set; }
         public float CableLength => _length;
-        public Vector3 AnchorPoint => _anchorBody ? _anchorBody.TransformPoint(_anchorLocal) : _anchorWorld;
+        public Vector3 AnchorPoint => _anchorBody ? _anchorBody.transform.TransformPoint(_anchorLocal) : _anchorWorld;
 
         OffroadVehicle _vehicle;
         LineRenderer _line;

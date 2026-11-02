@@ -72,7 +72,7 @@ namespace Offroad.Vehicles
 
         [Header("Engine")]
         [Tooltip("Peak engine torque (N m). The curve rises from idle, holds through the mid range and falls toward redline.")]
-        public float peakTorque = 520f;
+        public float peakTorque = 620f;
         public float idleRpm = 850f;
         public float redlineRpm = 4800f;
         [Tooltip("Engine braking at redline, as a fraction of peak torque.")]
@@ -85,20 +85,20 @@ namespace Offroad.Vehicles
         [Tooltip("Transfer-case low range, engaged in manual 1st: the crawl gear.")]
         public float lowRangeRatio = 2.72f;
         public float drivetrainEfficiency = 0.85f;
-        public float shiftTime = 0.22f;
-        public float autoUpshiftRpm = 4100f;
+        public float shiftTime = 0.15f;
+        public float autoUpshiftRpm = 3900f;
         public float autoDownshiftRpm = 1700f;
         [Tooltip("Manual gearbox: the player picks gears; 1st is low range.")]
         public bool manual;
         [Tooltip("Aerodynamic drag area (Cd x frontal area, m^2).")]
-        public float dragArea = 1.9f;
+        public float dragArea = 1.7f;
 
         [Header("Drivetrain")]
         [Tooltip("Garage engine upgrades scale the torque by this.")]
         public float torqueScale = 1f;
         public float reverseTopSpeed = 12f;
         public float brakeForce = 9000f;         // per wheel
-        public float rollingResistance = 30f;    // N per m/s per wheel
+        public float rollingResistance = 6f;     // N per m/s per wheel (plus aero drag on the body)
         [Tooltip("Seconds the brake must be held at a standstill before reverse engages.")]
         public float reverseDelay = 0.3f;
 
