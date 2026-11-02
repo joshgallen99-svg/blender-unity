@@ -29,6 +29,8 @@ from PIL import Image
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
+from obstacles import Course
+
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(REPO, "Assets", "Terrain", "Source~")
 MASKS = os.path.join(REPO, "Assets", "Terrain", "Masks")
@@ -477,6 +479,32 @@ for k in range(160, len(main) - 60, 90):
 
 # ---------------------------------------------------------------------------- output heights
 
+# Obstacle sections: the technical driving. The main track gets a run of them between landmarks; each
+# side track builds toward its landmark. Sections keep clear of water, bridges, landmarks and the spawn.
+print("Laying obstacle sections...")
+KINDS = dict(rock="Scan", rock_variants=5, rock_size=1.9, boulder="Scan", boulder_variants=5, boulder_size=1.9)
+def avoid(x, z):
+    return bool(sample(d_stream - s_hw, x, z) < 12 or ellipse_r(*TARN, x=x, z=z) < 1.4 or ellipse_r(*FROZEN, x=x, z=z) < 1.6 or math.hypot(x - spawn_x, z - spawn_z) < 60 or any(math.hypot(x - lx, z - lz) < 35 for lx, lz in (HUT, MINE, STATION)))
+courses = [Course("main", main, xs, zs, CELL, np.random.default_rng(SEED + 300), KINDS, avoid)
+           .add("rock_garden", 0.14 * path_length(main), 1)
+           .add("v_notch", 0.3 * path_length(main), 2)
+           .add("ledges", 0.45 * path_length(main), 2)
+           .add("off_camber", 0.6 * path_length(main), 2)
+           .add("rock_garden", 0.74 * path_length(main), 3)
+           .add("climb", 0.88 * path_length(main), 3)]
+SIDE_PLAN = {
+    "mine": [('ledges', 0.3, 2), ('rock_garden', 0.65, 3)],
+    "station": [('off_camber', 0.3, 2), ('climb', 0.65, 3)],
+    "frozen": [('rock_garden', 0.4, 2)],
+}
+for i, (k, plan) in enumerate(SIDE_PLAN.items()):
+    c = Course(k, side_paths[k], xs, zs, CELL, np.random.default_rng(SEED + 310 + i), KINDS, avoid)
+    for kind, frac, diff in plan:
+        c.add(kind, frac * path_length(side_paths[k]), diff)
+    courses.append(c)
+for c in courses:
+    c.shape(h)
+
 h = np.clip(h, 1, HEIGHT - 1)
 slope = slope_map(h)
 np.round(h / HEIGHT * 65535).astype("<u2").tofile(os.path.join(SRC, "alpine_height.r16"))
@@ -674,6 +702,10 @@ for name, sp in side_paths.items():           # signposts where side tracks leav
     ln = math.hypot(tx_, tz_) or 1
     markers.append(piece("Signpost", x0 + tz_ / ln * 3.0, z0 - tx_ / ln * 3.0, math.degrees(math.atan2(tx_, tz_)) + 90, 0.1))
 
+# Obstacle props go in last: they sit on the tracks on purpose, so nothing else clears them away.
+for c in courses:
+    props += c.props()
+
 with open(os.path.join(SRC, "alpine_scatter.json"), "w") as f_:
     json.dump({"props": props}, f_, separators=(",", ":"))
 counts = {}
@@ -705,7 +737,7 @@ info = {"size": SIZE, "height": HEIGHT, "resolution": N, "splatResolution": S,
         "spawn": {"x": round(spawn_x, 2), "z": round(spawn_z, 2), "yaw": round(spawn_heading, 1)},
         "landmarks": landmarks, "markers": markers, "formations": formations,
         "roadX": [round(float(x), 2) for x, _ in main[::6]], "roadZ": [round(float(z), 2) for _, z in main[::6]],
-        "tracks": [track_record("main", main, 4.0)] + [track_record(k, sp, 3.2) for k, sp in side_paths.items()],
+        "tracks": [track_record("main", main, 4.0)] + [track_record(k, sp, 3.2) for k, sp in side_paths.items()], "challenges": [r for c in courses for r in c.records()],
         "river": {"x": [round(float(x), 2) for x, _ in sv], "z": [round(float(z), 2) for _, z in sv],
                   "halfWidth": [round(float(v), 2) for v in stream_w[::4]],
                   "level": [round(float(v), 3) for v in stream_level[::4]]},

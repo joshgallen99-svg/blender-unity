@@ -30,6 +30,8 @@ from PIL import Image
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
+from obstacles import Course
+
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(REPO, "Assets", "Terrain", "Source~")
 MASKS = os.path.join(REPO, "Assets", "Terrain", "Masks")
@@ -466,6 +468,31 @@ landmark("the_wave", "The Wave", WAVE[0], WAVE[1], 90, [], discover_radius=95)
 rx_, rz_ = 830.0, 250.0
 landmark("rustbucket", "Rustbucket", rx_, rz_, 8, [piece("Wreck", rx_, rz_, 137, 0.45, 0.7)])
 
+# Obstacle sections: the technical driving. The main track gets a few milder ones; each side track is a
+# run of harder challenges building toward its landmark.
+print("Laying obstacle sections...")
+KINDS = dict(rock="Rock", rock_variants=5, rock_size=0.9, boulder="Boulder", boulder_variants=6, boulder_size=2.4)
+courses = [Course("main", road, xs, zs, CELL, np.random.default_rng(SEED + 300), KINDS)
+           .add("rock_garden", 0.16 * path_length(road), 1)
+           .add("v_notch", 0.46 * path_length(road), 1)
+           .add("ledges", 0.52 * path_length(road), 2)
+           .add("off_camber", 0.78 * path_length(road), 2)]
+SIDE_PLAN = {
+    "well":       [("rock_garden", 0.25, 1), ("ledges", 0.6, 2)],
+    "wave":       [("v_notch", 0.18, 2), ("rock_garden", 0.42, 2), ("off_camber", 0.68, 3)],
+    "chimneys":   [("ledges", 0.15, 2), ("rock_garden", 0.38, 3), ("climb", 0.6, 3), ("v_notch", 0.82, 2)],
+    "needle":     [("climb", 0.25, 2), ("ledges", 0.62, 3)],
+    "rustbucket": [("rock_garden", 0.2, 2), ("off_camber", 0.45, 2), ("climb", 0.7, 3)],
+    "playa":      [("v_notch", 0.4, 1)],
+}
+for i, (k, plan) in enumerate(SIDE_PLAN.items()):
+    c = Course(k, side_paths[k], xs, zs, CELL, np.random.default_rng(SEED + 310 + i), KINDS)
+    for kind, frac, diff in plan:
+        c.add(kind, frac * path_length(side_paths[k]), diff)
+    courses.append(c)
+for c in courses:
+    c.shape(h)
+
 h = np.clip(h, 1, HEIGHT - 1)
 slope = slope_map(h)
 np.round(h / HEIGHT * 65535).astype("<u2").tofile(os.path.join(SRC, "desert_height.r16"))
@@ -705,6 +732,10 @@ for k in range(1, len(wash)):
 for a in (0, math.pi):
     markers.append(piece("Cairn", rg_x + math.cos(a) * 40, rg_z + math.sin(a) * 40, 0, 0.05))
 
+# Obstacle props go in last: they sit on the tracks on purpose, so nothing else clears them away.
+for c in courses:
+    props += c.props()
+
 with open(os.path.join(SRC, "desert_scatter.json"), "w") as f_:
     json.dump({"props": props}, f_, separators=(",", ":"))
 counts = {}
@@ -776,7 +807,7 @@ info = {"size": SIZE, "height": HEIGHT, "resolution": N, "splatResolution": S,
         "layers": ["Sand", "Gravel", "CrackedSoil", "RedRock"],
         "spawn": {"x": round(spawn_x, 2), "z": round(spawn_z, 2), "yaw": round(spawn_heading, 1)},
         "landmarks": landmarks, "markers": markers, "formations": formations, "roadX": road_x, "roadZ": road_z,
-        "tracks": tracks}
+        "tracks": tracks, "challenges": [r for c in courses for r in c.records()]}
 with open(os.path.join(SRC, "desert_info.json"), "w") as f_:
     json.dump(info, f_, indent=1)
 print("Done.")

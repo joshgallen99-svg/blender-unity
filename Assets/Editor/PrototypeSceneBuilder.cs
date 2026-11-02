@@ -317,7 +317,10 @@ namespace Offroad.EditorTools
                         col.transform.SetParent(cgroup, false);
                         col.transform.SetPositionAndRotation(pos, Quaternion.FromToRotation(Vector3.up, up) * Quaternion.Euler(0f, p.yaw, 0f));
                         col.transform.localScale = Vector3.one * p.scale;
-                        col.AddComponent<MeshCollider>().sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+                        var mc = col.AddComponent<MeshCollider>();
+                        mc.sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+                        // Small rocks: a convex hull is cheaper and lets the wheels roll over cleanly.
+                        mc.convex = mc.sharedMesh.vertexCount <= 255;
                         col.isStatic = true;
                         gameObjects++;
                     }
@@ -902,21 +905,25 @@ namespace Offroad.EditorTools
                 return t.localPosition;
             }
 
-            art.bodies = new[] { "Ridgeback", "Packhorse" }.Select(b => new VehicleArt.BodyArt
+            art.bodies = new[] { "Crawler", "Ridgeback", "Packhorse" }.Select(b => new VehicleArt.BodyArt
             {
                 id = b,
                 body = Part($"Body_{b}"),
                 wheelPositions = WheelMarkers.Select(w => Marker($"{b}_{w}")).ToArray(),
                 spareMount = Marker($"{b}_Spare"),
                 accessories = new[] { Part($"RoofRack_{b}"), Part($"Snorkel_{b}"), Part($"BullBar_{b}") },
+                solidAxles = b == "Crawler",
             }).ToArray();
-            art.tires = new[] { Part("Wheel_AT"), Part("Wheel_MT"), Part("Wheel_Dune") };
+            art.tires = new[] { Part("Wheel_AT"), Part("Wheel_MT"), Part("Wheel_Dune"), Part("Wheel_Bead") };
+            art.axleHousing = Part("Axle_Housing");
+            art.link = Part("Link_Unit");
+            art.coilover = Part("Coilover_Unit");
             art.dustMaterial = MaterialLibrary.Dust();
             art.bodyPhysics = MaterialLibrary.VehicleBodyPhysics();
             EditorUtility.SetDirty(art);
             AssetDatabase.SaveAssets();
 
-            var fl = art.bodies[0].wheelPositions[0];
+            var fl = art.Body("Ridgeback").wheelPositions[0];
             if ((fl - VehicleRig.DefaultWheelPositions[0]).magnitude > 0.05f)
                 Debug.LogWarning($"[Offroad] Ridgeback FL wheel at {fl}, expected {VehicleRig.DefaultWheelPositions[0]} - check FBX axes");
             return art;
@@ -928,7 +935,7 @@ namespace Offroad.EditorTools
             var root = new GameObject("Expedition Vehicle");
             VehicleRig.Assemble(root, new VehicleRig.Parts
             {
-                wheelPositions = art.Body("Ridgeback").wheelPositions,
+                wheelPositions = art.Body("Crawler").wheelPositions,
                 dustMaterial = art.dustMaterial,
                 bodyPhysicsMaterial = art.bodyPhysics,
             });

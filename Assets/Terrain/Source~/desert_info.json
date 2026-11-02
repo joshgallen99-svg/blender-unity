@@ -168,7 +168,7 @@
    "model": "Cairn",
    "x": 63.91,
    "z": 339.26,
-   "yaw": 253.7,
+   "yaw": 210.6,
    "sink": 0.05,
    "align": 0.0
   },
@@ -176,7 +176,7 @@
    "model": "Cairn",
    "x": 137.57,
    "z": 315.54,
-   "yaw": 235.3,
+   "yaw": 103.7,
    "sink": 0.05,
    "align": 0.0
   },
@@ -184,7 +184,7 @@
    "model": "Cairn",
    "x": 227.53,
    "z": 334.62,
-   "yaw": 177.2,
+   "yaw": 299.8,
    "sink": 0.05,
    "align": 0.0
   },
@@ -192,7 +192,7 @@
    "model": "Cairn",
    "x": 298.28,
    "z": 359.9,
-   "yaw": 150.1,
+   "yaw": 159.4,
    "sink": 0.05,
    "align": 0.0
   },
@@ -200,7 +200,7 @@
    "model": "Cairn",
    "x": 382.26,
    "z": 339.73,
-   "yaw": 215.0,
+   "yaw": 265.1,
    "sink": 0.05,
    "align": 0.0
   },
@@ -208,7 +208,7 @@
    "model": "Cairn",
    "x": 469.03,
    "z": 359.48,
-   "yaw": 244.6,
+   "yaw": 202.9,
    "sink": 0.05,
    "align": 0.0
   },
@@ -216,7 +216,7 @@
    "model": "Cairn",
    "x": 549.13,
    "z": 391.58,
-   "yaw": 345.8,
+   "yaw": 55.4,
    "sink": 0.05,
    "align": 0.0
   },
@@ -224,7 +224,7 @@
    "model": "Cairn",
    "x": 624.26,
    "z": 434.97,
-   "yaw": 293.4,
+   "yaw": 52.6,
    "sink": 0.05,
    "align": 0.0
   },
@@ -7789,6 +7789,134 @@
     0.15,
     0.0
    ]
+  }
+ ],
+ "challenges": [
+  {
+   "track": "main",
+   "kind": "rock_garden",
+   "difficulty": 1,
+   "x": 565.1,
+   "z": 145.8
+  },
+  {
+   "track": "main",
+   "kind": "v_notch",
+   "difficulty": 1,
+   "x": 523.6,
+   "z": 473.5
+  },
+  {
+   "track": "main",
+   "kind": "ledges",
+   "difficulty": 2,
+   "x": 510.9,
+   "z": 538.7
+  },
+  {
+   "track": "main",
+   "kind": "off_camber",
+   "difficulty": 2,
+   "x": 476.2,
+   "z": 819.2
+  },
+  {
+   "track": "well",
+   "kind": "rock_garden",
+   "difficulty": 1,
+   "x": 553.3,
+   "z": 431.6
+  },
+  {
+   "track": "wave",
+   "kind": "v_notch",
+   "difficulty": 2,
+   "x": 466.3,
+   "z": 548.9
+  },
+  {
+   "track": "wave",
+   "kind": "rock_garden",
+   "difficulty": 2,
+   "x": 408.7,
+   "z": 565.8
+  },
+  {
+   "track": "wave",
+   "kind": "off_camber",
+   "difficulty": 3,
+   "x": 345.5,
+   "z": 580.3
+  },
+  {
+   "track": "chimneys",
+   "kind": "ledges",
+   "difficulty": 2,
+   "x": 491.3,
+   "z": 252.2
+  },
+  {
+   "track": "chimneys",
+   "kind": "rock_garden",
+   "difficulty": 3,
+   "x": 422.3,
+   "z": 242.5
+  },
+  {
+   "track": "chimneys",
+   "kind": "climb",
+   "difficulty": 3,
+   "x": 356.6,
+   "z": 233.7
+  },
+  {
+   "track": "chimneys",
+   "kind": "v_notch",
+   "difficulty": 2,
+   "x": 291.3,
+   "z": 219.6
+  },
+  {
+   "track": "needle",
+   "kind": "climb",
+   "difficulty": 2,
+   "x": 527.8,
+   "z": 788.7
+  },
+  {
+   "track": "needle",
+   "kind": "ledges",
+   "difficulty": 3,
+   "x": 594.1,
+   "z": 809.4
+  },
+  {
+   "track": "rustbucket",
+   "kind": "rock_garden",
+   "difficulty": 2,
+   "x": 617.8,
+   "z": 140.5
+  },
+  {
+   "track": "rustbucket",
+   "kind": "off_camber",
+   "difficulty": 2,
+   "x": 670.7,
+   "z": 183.0
+  },
+  {
+   "track": "rustbucket",
+   "kind": "climb",
+   "difficulty": 3,
+   "x": 728.5,
+   "z": 219.3
+  },
+  {
+   "track": "playa",
+   "kind": "v_notch",
+   "difficulty": 1,
+   "x": 689.4,
+   "z": 515.0
   }
  ]
 }

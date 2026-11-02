@@ -87,7 +87,7 @@ namespace Offroad.EditorTools
             {
                 ["Grass"] = new InstancedSpec(110f, false, 0.6f),
                 ["Scrub"] = new InstancedSpec(220f, true, 0.3f),
-                ["Rock"] = new InstancedSpec(180f, true, 0.8f),
+                ["Rock"] = new InstancedSpec(180f, true, 0.8f, 0f, true),
                 ["Yucca"] = new InstancedSpec(200f, true, 0.1f),
                 ["Boulder"] = new InstancedSpec(330f, true, 0.6f, 70f, true),
             },
@@ -116,6 +116,7 @@ namespace Offroad.EditorTools
         {
             id = "forest", title = "Forest", scenePath = "Assets/Scenes/Forest.unity",
             propsModel = "Assets/Models/Props/ForestProps.fbx",
+            extraPropsModels = new[] { "Assets/Models/Props/GraniteScans.fbx" },
             formationsModel = "Assets/Models/Formations/GraniteFormations.fbx",
             landmarkModels = new[] { "Assets/Models/Landmarks/ForestLandmarks.fbx", "Assets/Models/Landmarks/DesertLandmarks.fbx" },
             terrainMaterial = MaterialLibrary.ForestTerrain,
@@ -134,6 +135,7 @@ namespace Offroad.EditorTools
                 ["MeadowGrass"] = new InstancedSpec(110f, false, 0.6f),
                 ["Flowers"] = new InstancedSpec(100f, false, 0.6f),
                 ["GBoulder"] = new InstancedSpec(380f, true, 0.6f, 70f, true),
+                ["Scan"] = new InstancedSpec(300f, true, 0.7f, 60f, true),   // scanned granite: the obstacle rocks
             },
             kinds = new Dictionary<string, PropKind>
             {
@@ -159,7 +161,7 @@ namespace Offroad.EditorTools
         {
             id = "alpine", title = "Alpine", scenePath = "Assets/Scenes/Alpine.unity",
             propsModel = "Assets/Models/Props/AlpineProps.fbx",
-            extraPropsModels = new[] { "Assets/Models/Props/ForestProps.fbx" },
+            extraPropsModels = new[] { "Assets/Models/Props/ForestProps.fbx", "Assets/Models/Props/GraniteScans.fbx" },
             formationsModel = "Assets/Models/Formations/AlpineFormations.fbx",
             landmarkModels = new[] { "Assets/Models/Landmarks/AlpineLandmarks.fbx", "Assets/Models/Landmarks/ForestLandmarks.fbx",
                                      "Assets/Models/Landmarks/DesertLandmarks.fbx" },
@@ -176,8 +178,9 @@ namespace Offroad.EditorTools
                 ["Krummholz"] = new InstancedSpec(220f, true, 0.5f),
                 ["Tussock"] = new InstancedSpec(100f, false, 0.6f),
                 ["Cushion"] = new InstancedSpec(80f, false, 0.7f),
-                ["ScreeRock"] = new InstancedSpec(140f, false, 0.85f),
+                ["ScreeRock"] = new InstancedSpec(140f, false, 0.85f, 0f, true),
                 ["SBoulder"] = new InstancedSpec(400f, true, 0.6f, 70f, true),
+                ["Scan"] = new InstancedSpec(300f, true, 0.7f, 60f, true),
                 ["SnowPole"] = new InstancedSpec(260f, true, 0f),
             },
             kinds = new Dictionary<string, PropKind>(),
