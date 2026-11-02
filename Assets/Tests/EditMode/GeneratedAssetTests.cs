@@ -186,4 +186,33 @@ public class GeneratedAssetTests
         var fir = props.transform.Find("Fir_1").GetComponent<MeshFilter>().sharedMesh.bounds;
         Assert.Greater(fir.size.y, fir.size.x * 1.5f);
     }
+
+    [Test]
+    public void AlpineRegionDataAndModelsExist()
+    {
+        var info = JsonUtility.FromJson<PrototypeSceneBuilder.RegionInfo>(File.ReadAllText("Assets/Terrain/Source~/alpine_info.json"));
+        Assert.AreEqual(info.resolution * info.resolution * 2, new FileInfo("Assets/Terrain/Source~/alpine_height.r16").Length);
+        Assert.GreaterOrEqual(info.tracks.Length, 3, "pass track plus side tracks");
+        Assert.Greater(info.river.x.Length, 100, "meltwater stream");
+        Assert.Greater(info.lake.rx, 10f, "glacier tarn");
+        Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Masks/alpine_mask.png"));
+        Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Terrain/Masks/alpine_hazard.png"));
+        foreach (var t in new[] { "Snow", "Scree", "AlpineGrass", "AlpineRock", "AlpineTrack" })
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Textures/{t}_albedo.png"), t);
+        var props = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Props/AlpineProps.fbx");
+        Assert.IsNotNull(props);
+        foreach (var n in new[] { "Krummholz_0", "Tussock_1", "Cushion_0", "SBoulder_2_LOD1", "ScreeRock_2", "SnowPole_0" })
+            Assert.IsNotNull(props.transform.Find(n), n);
+        var rock = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Formations/AlpineFormations.fbx");
+        foreach (var f in info.formations)
+            Assert.IsNotNull(rock.transform.Find(f.model + "_LOD1"), f.model);
+        var landmarks = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Landmarks/AlpineLandmarks.fbx");
+        foreach (var n in new[] { "StoneHut", "Cairn", "SummitSign", "MineAdit", "OreCart", "Rails", "WeatherStation" })
+            Assert.IsNotNull(landmarks.transform.Find(n), n);
+        // Every mission target in the region exists as a landmark.
+        foreach (var m in Offroad.Game.Missions.All)
+            if (m.region == Offroad.Game.Regions.Alpine)
+                foreach (var t in m.targets)
+                    Assert.IsTrue(System.Array.Exists(info.landmarks, l => l.id == t), $"{m.id}: {t}");
+    }
 }

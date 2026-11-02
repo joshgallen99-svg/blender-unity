@@ -38,12 +38,14 @@ namespace Offroad.EditorTools
     {
         public string id, title, scenePath;
         public string propsModel, formationsModel;
+        public string[] extraPropsModels;                    // further models props are looked up in (e.g. shared firs)
         public string[] landmarkModels;
         public Func<Texture2D, Material> terrainMaterial;
         public Func<Material> trackMaterial;
         public Func<string, string> layerTexture;            // physics layer -> terrain texture (for TerrainLayers)
         public TerrainSurfaces.LayerSurface[] surfaces;       // null = TerrainSurfaces defaults (desert)
         public bool hazardGreenIsWater;
+        public bool hazardSnowAndIce;                        // hazard R = deep snow, B = ice (instead of mud / washboard)
         public Dictionary<string, InstancedSpec> instanced;
         public Dictionary<string, PropKind> kinds;
         public bool water;
@@ -63,6 +65,11 @@ namespace Offroad.EditorTools
         public float shadowStrength = 0.9f;        // lower = more skylight in the shade
         public float postExposure = 0.08f;
         public float shaftIntensity = 0.55f, shaftThreshold = 1.1f;
+        public float backdropScale = 1f, midBackdropScale = 1f, midSnowLine;
+        public bool midJagged;
+        public Color waterShallow = new Color(0.26f, 0.31f, 0.21f), waterDeep = new Color(0.03f, 0.08f, 0.07f);
+        public float waterClarity = 0.75f;
+        public float fogStart = 200f, fogEnd = 900f;
     }
 
     public static class RegionProfiles
@@ -148,6 +155,50 @@ namespace Offroad.EditorTools
             shadowStrength = 0.68f, postExposure = 0.22f, shaftIntensity = 0.75f, shaftThreshold = 0.95f,
         };
 
-        public static readonly RegionProfile[] All = { Desert, Forest };
+        public static readonly RegionProfile Alpine = new RegionProfile
+        {
+            id = "alpine", title = "Alpine", scenePath = "Assets/Scenes/Alpine.unity",
+            propsModel = "Assets/Models/Props/AlpineProps.fbx",
+            extraPropsModels = new[] { "Assets/Models/Props/ForestProps.fbx" },
+            formationsModel = "Assets/Models/Formations/AlpineFormations.fbx",
+            landmarkModels = new[] { "Assets/Models/Landmarks/AlpineLandmarks.fbx", "Assets/Models/Landmarks/ForestLandmarks.fbx",
+                                     "Assets/Models/Landmarks/DesertLandmarks.fbx" },
+            terrainMaterial = MaterialLibrary.AlpineTerrain,
+            trackMaterial = MaterialLibrary.DirtTrackAlpine,
+            layerTexture = name => name switch { "Scree" => "Scree", "Snow" => "Snow", "Rock" => "AlpineRock", _ => "AlpineGrass" },
+            surfaces = TerrainSurfaces.AlpineLayers(),
+            hazardGreenIsWater = true,
+            hazardSnowAndIce = true,
+            water = true,
+            instanced = new Dictionary<string, InstancedSpec>
+            {
+                ["Fir"] = new InstancedSpec(900f, true, 0.05f, 50f, false, 170f, 0.25f, 6f),
+                ["Krummholz"] = new InstancedSpec(220f, true, 0.5f),
+                ["Tussock"] = new InstancedSpec(100f, false, 0.6f),
+                ["Cushion"] = new InstancedSpec(80f, false, 0.7f),
+                ["ScreeRock"] = new InstancedSpec(140f, false, 0.85f),
+                ["SBoulder"] = new InstancedSpec(400f, true, 0.6f, 70f, true),
+                ["SnowPole"] = new InstancedSpec(260f, true, 0f),
+            },
+            kinds = new Dictionary<string, PropKind>(),
+            // Crisp high-altitude light: a whiter sun, deep blue zenith, cool shade, thin haze.
+            sunEuler = new Vector3(32f, 128f, 0f), sunColor = new Color(1f, 0.93f, 0.82f), sunIntensity = 2.7f,
+            ambientSky = new Color(0.50f, 0.62f, 0.82f), ambientEquator = new Color(0.58f, 0.62f, 0.66f),
+            ambientGround = new Color(0.36f, 0.36f, 0.32f), fogColor = new Color(0.72f, 0.79f, 0.88f),
+            zenith = new Color(0.10f, 0.25f, 0.56f), horizon = new Color(0.60f, 0.71f, 0.86f), sunGlow = new Color(1f, 0.92f, 0.78f),
+            skyTint = new Color(0.40f, 0.52f, 0.72f), atmosphereThickness = 0.8f, skyExposure = 1.2f,
+            farLit = new Color(0.72f, 0.77f, 0.86f), farShadow = new Color(0.38f, 0.46f, 0.60f), farHaze = new Color(0.72f, 0.79f, 0.88f),
+            farHazeAmount = 0.45f, farHazeHeight = 700f, farSnowLine = 0.5f,
+            midLit = new Color(0.46f, 0.47f, 0.50f), midShadow = new Color(0.22f, 0.26f, 0.33f), midHaze = new Color(0.72f, 0.79f, 0.88f),
+            midHazeAmount = 0.4f, midHazeHeight = 300f,
+            contrast = 14f, saturation = 6f, temperature = -2f,
+            cloudCoverage = 0.42f,
+            shadowStrength = 0.78f, postExposure = 0.05f, shaftIntensity = 0.6f, shaftThreshold = 1.05f,
+            backdropScale = 1.9f, midBackdropScale = 2.6f, midSnowLine = 300f, midJagged = true,
+            waterShallow = new Color(0.22f, 0.50f, 0.50f), waterDeep = new Color(0.02f, 0.24f, 0.30f), waterClarity = 1.1f,
+            fogStart = 260f, fogEnd = 1300f,
+        };
+
+        public static readonly RegionProfile[] All = { Desert, Forest, Alpine };
     }
 }

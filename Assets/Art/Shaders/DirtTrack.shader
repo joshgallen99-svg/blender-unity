@@ -19,6 +19,7 @@ Shader "Offroad/DirtTrack"
         _RutWidth ("Rut Width (m)", Float) = 0.26
         _RutDepth ("Rut Depth (m)", Float) = 0.07
         _NormalStrength ("Normal Strength", Range(0, 2)) = 1
+        [ToggleUI] _SnowHazards ("Hazard map R/B = deep snow / ice (alpine)", Float) = 0
     }
 
     SubShader
@@ -50,6 +51,7 @@ Shader "Offroad/DirtTrack"
                 float _DirtScale, _SandScale;
                 float _RutGauge, _RutWidth, _RutDepth;
                 half _NormalStrength;
+                half _SnowHazards;
             CBUFFER_END
 
             TEXTURE2D(_DirtTex); SAMPLER(sampler_DirtTex);
@@ -152,6 +154,11 @@ Shader "Offroad/DirtTrack"
                 half smooth = 0.08;
                 float2 huv = (p.xz - _OffroadTerrainRect.xy) / max(_OffroadTerrainRect.zw, 1.0);
                 half4 hz = SAMPLE_TEXTURE2D(_OffroadHazard, sampler_OffroadHazard, huv) * _OffroadHazardOn;
+                // Alpine: snow drifts and sheet ice cover the track (the terrain beneath draws them), and
+                // only meltwater (A) wets it.
+                half covered = _SnowHazards * saturate(smoothstep(0.25, 0.55, hz.r + (macroS.g - 0.5) * 0.3) + smoothstep(0.3, 0.55, hz.b));
+                alpha *= 1.0 - covered;
+                hz.rb *= 1.0 - _SnowHazards;
                 half wet = saturate(hz.r * 1.4 + hz.g + hz.a);
                 col = lerp(col, col * half3(0.42, 0.40, 0.38), wet);
                 smooth = lerp(smooth, 0.5, wet);

@@ -15,15 +15,20 @@ namespace Offroad.World
         public Material farMaterial;
         public Material midMaterial;
         public int seed = 7;
+        [Tooltip("Scales the far ranges' height (alpine regions need taller peaks behind their own).")]
+        public float heightScale = 1f;
+        public float midHeightScale = 1f;
+        [Tooltip("Mid-distance ring as jagged peaks instead of flat-topped mesas.")]
+        public bool midJagged;
 
         readonly List<(Mesh mesh, Material mat)> _layers = new List<(Mesh, Material)>();
 
         void Awake()
         {
             _layers.Clear();
-            if (farMaterial) _layers.Add((Range(2600f, 380f, 0.9f, seed, jagged: true), farMaterial));
-            if (farMaterial) _layers.Add((Range(3400f, 520f, 0.75f, seed + 3, jagged: true), farMaterial));
-            if (midMaterial) _layers.Add((Range(1400f, 150f, 1.0f, seed + 7, jagged: false), midMaterial));
+            if (farMaterial) _layers.Add((Range(2600f, 380f * heightScale, 0.9f, seed, jagged: true), farMaterial));
+            if (farMaterial) _layers.Add((Range(3400f, 520f * heightScale, 0.75f, seed + 3, jagged: true), farMaterial));
+            if (midMaterial) _layers.Add((Range(1400f, 150f * midHeightScale, 1.0f, seed + 7, jagged: midJagged), midMaterial));
         }
 
         /// <summary>A closed ring of peaks (jagged) or flat-topped mesas, facing inward.</summary>

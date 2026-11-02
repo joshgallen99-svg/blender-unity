@@ -42,6 +42,10 @@ namespace Offroad.World
         public LayerSurface quicksand = new LayerSurface("Quicksand", 0.55f, 0.4f, 1.2f, 0.6f, new Color(0.62f, 0.5f, 0.38f));
         [Tooltip("Hazard map green = water depth / 2.5 m (rivers) instead of quicksand.")]
         public bool greenIsWater;
+        [Tooltip("Hazard map red = deep snow and blue = ice (alpine) instead of mud and washboard.")]
+        public bool snowAndIce;
+        public LayerSurface deepSnow = new LayerSurface("DeepSnow", 0.62f, 0.55f, 0.9f, 0.9f, new Color(0.93f, 0.95f, 0.98f));
+        public LayerSurface ice = new LayerSurface("Ice", 0.3f, 0.32f, 0f, 0.15f, new Color(0.85f, 0.9f, 0.95f));
         public Color splashColor = new Color(0.85f, 0.9f, 0.95f);
 
         /// <summary>Default physics layers for the forest valley (forest floor, meadow, soil, rock).</summary>
@@ -51,6 +55,15 @@ namespace Offroad.World
             new LayerSurface("Meadow", 0.9f, 0.9f, 0.1f, 0.25f, new Color(0.45f, 0.42f, 0.30f), 0.025f, 2),
             new LayerSurface("Soil", 0.93f, 0.9f, 0.08f, 0.6f, new Color(0.36f, 0.26f, 0.18f), 0.035f, 2),
             new LayerSurface("Granite", 1.1f, 1.0f, 0.0f, 0.12f, new Color(0.55f, 0.55f, 0.53f), 0f, 3),
+        };
+
+        /// <summary>Default physics layers for the alpine pass (tundra, scree, snow, rock).</summary>
+        public static LayerSurface[] AlpineLayers() => new[]
+        {
+            new LayerSurface("Tundra", 0.95f, 0.93f, 0.08f, 0.3f, new Color(0.45f, 0.42f, 0.33f), 0.02f, 2),
+            new LayerSurface("Scree", 0.88f, 0.9f, 0.14f, 0.55f, new Color(0.55f, 0.54f, 0.52f), 0.02f, 1),
+            new LayerSurface("Snow", 0.72f, 0.7f, 0.35f, 0.8f, new Color(0.93f, 0.95f, 0.98f), 0.05f, 0),
+            new LayerSurface("Rock", 1.1f, 1.0f, 0.0f, 0.12f, new Color(0.5f, 0.5f, 0.5f), 0f, 3),
         };
 
         Terrain _terrain;
@@ -111,7 +124,24 @@ namespace Offroad.World
         void ApplyHazards(ref SurfaceInfo s, float u, float v)
         {
             var hz = hazardMap.GetPixelBilinear(u, v);
-            float mudW = Mathf.Clamp01(Mathf.Max(hz.r, hz.a));
+            if (snowAndIce)
+            {
+                // Deep snow (R), ice (B); slushy meltwater (A) behaves like mud.
+                float snowW = Mathf.Clamp01(hz.r);
+                float iceW = Mathf.Clamp01(hz.b * 1.2f);
+                float slush = Mathf.Clamp01(hz.a);
+                if (snowW > 0.02f) Blend(ref s, deepSnow, snowW);
+                if (slush > 0.02f) Blend(ref s, mud, slush);
+                if (iceW > 0.02f) Blend(ref s, ice, iceW);
+                s.snow = snowW;
+                s.ice = iceW;
+                s.mud = slush;
+                s.sink *= 1f - iceW;
+                hz.b = 0f;                       // no washboard here
+                hz.r = 0f;
+                hz.a = 0f;
+            }
+            float mudW = Mathf.Max(s.mud, Mathf.Clamp01(Mathf.Max(hz.r, hz.a)));
             float quick = greenIsWater ? 0f : Mathf.Clamp01(hz.g);
             if (mudW > 0.02f) Blend(ref s, mud, mudW);
             if (quick > 0.02f) Blend(ref s, quicksand, quick);

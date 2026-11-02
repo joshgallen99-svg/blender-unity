@@ -19,6 +19,8 @@ Shader "Offroad/ForestRock"
         _SkirtHeight ("Sand Skirt Height (m)", Float) = 1.2
         _BumpScale ("Normal Strength", Range(0, 2)) = 1
         _Smoothness ("Smoothness", Range(0, 1)) = 0.1
+        _SnowHeight ("Snow on Ledges Start/Full (world Y)", Vector) = (100000, 100001, 0, 0)
+        _SnowAmount ("Snow on Ledges", Range(0, 1)) = 0.6
     }
 
     SubShader
@@ -40,6 +42,8 @@ Shader "Offroad/ForestRock"
             float _SkirtHeight;
             half _BumpScale;
             half _Smoothness;
+            float4 _SnowHeight;
+            half _SnowAmount;
         CBUFFER_END
 
         TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -133,17 +137,22 @@ Shader "Offroad/ForestRock"
                 // Contact darkening just above the sand line.
                 half occlusion = lerp(0.62, 1.0, saturate((above - 0.1) / 2.5));
 
+                // High up: snow lies on the ledges and upward faces (alpine rock only; off by default).
+                half snowH = smoothstep(_SnowHeight.x, _SnowHeight.y, p.y + (macro2.r - 0.5) * 40.0);
+                half snowW = saturate((up - (1.0 - _SnowAmount) + (macro2.b - 0.5) * 0.3 + (0.5 - rockTex.a) * 0.25) * 6.0) * snowH;
+                half3 snowCol = half3(0.88, 0.91, 0.95) * lerp(0.93, 1.04, macro.r);
+
                 SurfaceData s = (SurfaceData)0;
-                s.albedo = lerp(rock, sand, sandW);
-                s.smoothness = lerp(_Smoothness, 0.05, sandW);
+                s.albedo = lerp(lerp(rock, sand, sandW), snowCol, snowW);
+                s.smoothness = lerp(lerp(_Smoothness, 0.05, sandW), 0.3, snowW);
                 s.normalTS = half3(0, 0, 1);
-                s.occlusion = lerp(occlusion, 1.0, sandW * 0.6);
+                s.occlusion = lerp(lerp(occlusion, 1.0, sandW * 0.6), 1.0, snowW);
                 s.alpha = 1;
 
                 InputData d = (InputData)0;
                 d.positionWS = p;
                 d.positionCS = i.positionCS;
-                d.normalWS = normalize(lerp(rockN, normalize(lerp(n, half3(0, 1, 0), 0.4)), sandW));
+                d.normalWS = normalize(lerp(rockN, normalize(lerp(n, half3(0, 1, 0), 0.4)), saturate(sandW + snowW)));
                 d.viewDirectionWS = GetWorldSpaceNormalizeViewDir(p);
                 d.shadowCoord = TransformWorldToShadowCoord(p);
                 d.fogCoord = i.originFog.w;

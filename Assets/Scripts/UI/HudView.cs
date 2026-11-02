@@ -26,7 +26,7 @@ namespace Offroad.UI
 
         // Text is rebuilt at ~8 Hz (and only when it changes) so the HUD makes no garbage per frame.
         const float TextInterval = 0.125f;
-        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "DIRT", "ROCK", "MUD", "QUICKSAND", "WASHBOARD", "WATER" };
+        static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "DIRT", "ROCK", "MUD", "QUICKSAND", "WASHBOARD", "WATER", "SNOW", "DEEP SNOW", "ICE" };
         static readonly string[] Numbers = BuildNumbers(400);
         readonly List<(float d, Landmark l)> _nearby = new List<(float, Landmark)>();
         readonly Vector3[] _markerTarget = new Vector3[8];
@@ -166,7 +166,7 @@ namespace Offroad.UI
 
             // Surface under the wheels and how well the fitted tyres suit it.
             Vector4 layers = Vector4.zero;
-            float mud = 0f, quick = 0f, wash = 0f;
+            float mud = 0f, quick = 0f, wash = 0f, snow = 0f, ice = 0f;
             int grounded = 0;
             foreach (var w in v.wheels)
             {
@@ -175,6 +175,8 @@ namespace Offroad.UI
                 mud += w.surface.mud;
                 quick += w.surface.quicksand;
                 wash += w.surface.washboard;
+                snow += w.surface.snow;
+                ice += w.surface.ice;
                 grounded++;
             }
             if (grounded > 0 && refreshText)
@@ -182,7 +184,11 @@ namespace Offroad.UI
                 int best = 0;
                 for (int i = 1; i < 4; i++) if (layers[i] > layers[best]) best = i;
                 float inv = 1f / grounded;
+                bool alpine = v.surfaceProvider is TerrainSurfaces ts && ts.snowAndIce;
+                if (alpine && best == 0) best = 8;          // the "sand" class is snow up here
                 if (v.WaterDepth > 0.08f) best = 7;
+                else if (ice * inv > 0.3f) best = 10;
+                else if (snow * inv > 0.35f) best = 9;
                 else if (quick * inv > 0.3f) best = 5;
                 else if (mud * inv > 0.4f) best = 4;
                 else if (wash * inv > 0.3f) best = 6;
@@ -241,6 +247,16 @@ namespace Offroad.UI
             else if (v.WaterDepth > v.fordingDepth * 0.7f)
             {
                 SetText(_warning, v.Flooded ? "TOO DEEP  ·  engine flooding, back out or press R" : "DEEP WATER  ·  ease off");
+                _warning.AddToClassList("shown");
+            }
+            else if (grounded > 0 && ice / grounded > 0.3f && Mathf.Abs(v.ForwardSpeed) > 6f)
+            {
+                SetText(_warning, "ICE  ·  gentle on the throttle and brakes");
+                _warning.AddToClassList("shown");
+            }
+            else if (grounded > 0 && snow / grounded > 0.5f && Mathf.Abs(v.ForwardSpeed) < 2f)
+            {
+                SetText(_warning, "DEEP SNOW  ·  rock back and forth, or press R");
                 _warning.AddToClassList("shown");
             }
             else _warning.RemoveFromClassList("shown");

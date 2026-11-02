@@ -52,6 +52,9 @@ namespace Offroad.EditorTools
             ["Ash"] = new Spec(0.05f, 0.045f, 0.04f, 0f, 0.95f, 0f, true),
             ["WoodEnd"] = new Spec(0.62f, 0.48f, 0.33f, 0f, 0.8f, 0f, true),
             ["BarkAspen"] = new Spec(0.80f, 0.78f, 0.71f, 0f, 0.75f, 0f, true),
+            ["RoofRed"] = new Spec(0.32f, 0.05f, 0.035f, 0.3f, 0.55f),
+            ["PoleOrange"] = new Spec(0.85f, 0.28f, 0.04f, 0f, 0.5f, 0f, true),
+            ["PoleBlack"] = new Spec(0.03f, 0.03f, 0.03f, 0f, 0.6f, 0f, true),
         };
 
         static readonly Dictionary<string, Material> Cache = new Dictionary<string, Material>();
@@ -73,6 +76,10 @@ namespace Offroad.EditorTools
             ["MeadowGrass"] = () => Foliage("MeadowGrass", "MeadowGrass", 0.14f, 0.8f),
             ["Wildflowers"] = () => Foliage("Wildflowers", "Wildflowers", 0.14f, 0.7f),
             ["Granite"] = () => ForestRock(),
+            // Alpine pass.
+            ["AlpineRock"] = () => AlpineRock(),
+            ["TundraGrass"] = () => Foliage("TundraGrass", "MeadowGrass", 0.16f, 0.6f, new Color(1.3f, 1.08f, 0.62f)),
+            ["AlpineFlowers"] = () => Foliage("AlpineFlowers", "Wildflowers", 0.12f, 0.45f, new Color(1.05f, 0.95f, 1.0f)),
             ["LeavesFlowering"] = () => Foliage("LeavesFlowering", "ScrubFlowering", 0.07f, 1.3f),
             ["GrassCards"] = () => Foliage("GrassCards", "DryGrass", 0.14f, 0.7f),
             ["Wood"] = () => Textured("Wood", "Wood", Color.white, 0f, 0.12f),
@@ -166,6 +173,66 @@ namespace Offroad.EditorTools
             return m;
         }
 
+        /// <summary>Alpine gneiss: triplanar dark rock, lichen, tundra turf on low ledges and snow on high ones.</summary>
+        static Material AlpineRock()
+        {
+            var m = LoadOrCreate($"{Dir}/AlpineRock.mat", "Offroad/ForestRock");
+            m.SetTexture("_BaseMap", Tex("AlpineRock_albedo"));
+            m.SetTexture("_BumpMap", Tex("AlpineRock_normal"));
+            m.SetTexture("_TopMap", Tex("AlpineGrass_albedo"));
+            m.SetTexture("_TopNormal", Tex("AlpineGrass_normal"));
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetColor("_BaseColor", new Color(1.05f, 1.05f, 1.05f));
+            m.SetColor("_TopColor", Color.white);
+            m.SetFloat("_Scale", 7f);
+            m.SetFloat("_TopScale", 4f);
+            m.SetFloat("_TopAmount", 0.3f);
+            m.SetFloat("_TopSharpness", 4f);
+            m.SetFloat("_SkirtHeight", 0.6f);
+            m.SetFloat("_Smoothness", 0.12f);
+            m.SetVector("_SnowHeight", new Vector4(225f, 285f, 0f, 0f));
+            m.SetFloat("_SnowAmount", 0.62f);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>Alpine ground: tundra / scree / snow / track gravel from the region mask, gneiss on slopes.</summary>
+        public static Material AlpineTerrain(Texture2D mask)
+        {
+            var m = LoadOrCreate($"{Dir}/AlpineTerrain.mat", "Offroad/AlpineTerrain");
+            m.SetTexture("_Mask", mask);
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetTexture("_GrassTex", Tex("AlpineGrass_albedo"));
+            m.SetTexture("_GrassNrm", Tex("AlpineGrass_normal"));
+            m.SetTexture("_ScreeTex", Tex("Scree_albedo"));
+            m.SetTexture("_ScreeNrm", Tex("Scree_normal"));
+            m.SetTexture("_SnowTex", Tex("Snow_albedo"));
+            m.SetTexture("_SnowNrm", Tex("Snow_normal"));
+            m.SetTexture("_TrackTex", Tex("AlpineTrack_albedo"));
+            m.SetTexture("_TrackNrm", Tex("AlpineTrack_normal"));
+            m.SetTexture("_RockTex", Tex("AlpineRock_albedo"));
+            m.SetTexture("_RockNrm", Tex("AlpineRock_normal"));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>Alpine variant of the dirt track: grey gravel with tundra creeping onto the crown.</summary>
+        public static Material DirtTrackAlpine()
+        {
+            var m = LoadOrCreate($"{Dir}/DirtTrackAlpine.mat", "Offroad/DirtTrack");
+            m.SetFloat("_SnowHazards", 1f);
+            m.SetTexture("_DirtTex", Tex("AlpineTrack_albedo"));
+            m.SetTexture("_DirtNrm", Tex("AlpineTrack_normal"));
+            m.SetTexture("_SandTex", Tex("AlpineGrass_albedo"));
+            m.SetTexture("_Macro", Tex("Macro"));
+            m.SetFloat("_DirtScale", 3f);
+            m.SetFloat("_SandScale", 4f);
+            m.renderQueue = 1950;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         /// <summary>Forest ground: forest floor / meadow / soil / gravel from the region mask, granite on slopes.</summary>
         public static Material ForestTerrain(Texture2D mask)
         {
@@ -223,14 +290,14 @@ namespace Offroad.EditorTools
             return m;
         }
 
-        public static Material Water()
+        public static Material Water(string name, Color shallow, Color deep, float clarity)
         {
-            var m = LoadOrCreate($"{Dir}/Water.mat", "Offroad/Water");
+            var m = LoadOrCreate($"{Dir}/{name}.mat", "Offroad/Water");
             m.SetTexture("_NormalTex", Tex("Water_normal"));
             m.SetTexture("_FoamTex", Tex("Foam_albedo"));
-            m.SetColor("_ShallowColor", new Color(0.26f, 0.31f, 0.21f));
-            m.SetColor("_DeepColor", new Color(0.03f, 0.08f, 0.07f));
-            m.SetFloat("_Clarity", 0.75f);
+            m.SetColor("_ShallowColor", shallow);
+            m.SetColor("_DeepColor", deep);
+            m.SetFloat("_Clarity", clarity);
             m.renderQueue = 2990;
             EditorUtility.SetDirty(m);
             return m;

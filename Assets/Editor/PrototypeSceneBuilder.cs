@@ -91,6 +91,7 @@ namespace Offroad.EditorTools
         {
             P = profile;
             AssetDatabase.ImportAsset(P.propsModel, ImportAssetOptions.ForceUpdate);
+            foreach (var m in P.extraPropsModels ?? Array.Empty<string>()) AssetDatabase.ImportAsset(m, ImportAssetOptions.ForceUpdate);
             foreach (var m in P.landmarkModels) AssetDatabase.ImportAsset(m, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(P.formationsModel, ImportAssetOptions.ForceUpdate);
 
@@ -139,15 +140,18 @@ namespace Offroad.EditorTools
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = P.fogColor;           // blue aerial haze
-            RenderSettings.fogStartDistance = 200f;
-            RenderSettings.fogEndDistance = 900f;
+            RenderSettings.fogStartDistance = P.fogStart;
+            RenderSettings.fogEndDistance = P.fogEnd;
 
             var backdrop = new GameObject("Distant Ranges").AddComponent<Backdrop>();
             string prefix = P == RegionProfiles.Desert ? "" : P.title;
             backdrop.farMaterial = MaterialLibrary.Backdrop($"{prefix}BackdropRanges", P.farLit, P.farShadow, P.farHaze,
-                P.farHazeAmount, P.farHazeHeight, P.farSnowLine > 0 ? 300f : 0f);
+                P.farHazeAmount, P.farHazeHeight, P.farSnowLine > 0 ? 300f * P.backdropScale : 0f);
             backdrop.midMaterial = MaterialLibrary.Backdrop($"{prefix}BackdropMesas", P.midLit, P.midShadow, P.midHaze,
-                P.midHazeAmount, P.midHazeHeight);
+                P.midHazeAmount, P.midHazeHeight, P.midSnowLine);
+            backdrop.heightScale = P.backdropScale;
+            backdrop.midHeightScale = P.midBackdropScale;
+            backdrop.midJagged = P.midJagged;
             var clouds = backdrop.gameObject.AddComponent<SkyClouds>();
             clouds.material = MaterialLibrary.Clouds($"Clouds{P.title}", P.cloudCoverage, P.fogColor);
             return sun;
@@ -214,6 +218,7 @@ namespace Offroad.EditorTools
             var surfaces = go.AddComponent<TerrainSurfaces>();
             if (P.surfaces != null) surfaces.layers = P.surfaces;
             surfaces.greenIsWater = P.hazardGreenIsWater;
+            surfaces.snowAndIce = P.hazardSnowAndIce;
             var hazard = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Terrain/Masks/{Region}_hazard.png");
             surfaces.hazardMap = hazard;      // mud, quicksand, washboard, water (read on the CPU too)
 
@@ -268,8 +273,11 @@ namespace Offroad.EditorTools
         static void PlaceProps(Terrain terrain, RegionInfo info)
         {
             var scatter = ReadJson<ScatterFile>($"{SourceDir}/{Region}_scatter.json");
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(P.propsModel);
-            if (model == null) throw new Exception("Props model missing: " + P.propsModel);
+            var models = new[] { P.propsModel }.Concat(P.extraPropsModels ?? Array.Empty<string>())
+                .Select(AssetDatabase.LoadAssetAtPath<GameObject>).Where(m => m != null).ToArray();
+            if (models.Length == 0) throw new Exception("Props model missing: " + P.propsModel);
+            Transform FindPart(string n) => models.Select(m => m.transform.Find(n)).FirstOrDefault(t => t != null);
+            GameObject ModelOf(string n) => models.FirstOrDefault(m => m.transform.Find(n) != null) ?? models[0];
             var prefabs = new Dictionary<string, GameObject>();
             var root = new GameObject("Props").transform;
             var groups = new Dictionary<string, Transform>();
@@ -296,8 +304,8 @@ namespace Offroad.EditorTools
                     if (spec.collider)
                     {
                         // Collider only: the mesh itself is drawn by the instancer.
-                        var src = model.transform.Find(key + "_LOD1");
-                        if (src == null) src = model.transform.Find(key);
+                        var src = FindPart(key + "_LOD1");
+                        if (src == null) src = FindPart(key);
                         if (src == null) continue;
                         if (!groups.TryGetValue(p.kind, out var cgroup))
                         {
@@ -318,7 +326,7 @@ namespace Offroad.EditorTools
 
                 if (!prefabs.TryGetValue(key, out var prefab))
                 {
-                    prefab = CreatePropPrefab(model, key, KindOf(p.kind));
+                    prefab = CreatePropPrefab(ModelOf(key), key, KindOf(p.kind));
                     prefabs[key] = prefab;
                 }
                 if (prefab == null) continue;
@@ -338,11 +346,11 @@ namespace Offroad.EditorTools
 
             foreach (var kv in data)
             {
-                var src = model.transform.Find(kv.Key);
+                var src = FindPart(kv.Key);
                 if (src == null) { Debug.LogWarning($"[Offroad] Prop mesh {kv.Key} not found"); continue; }
                 var spec = P.instanced[kv.Key.Split('_')[0]];
-                var lodSrc = spec.lod > 0f ? model.transform.Find(kv.Key + "_LOD1") : null;
-                var lod2Src = spec.lod2 > 0f ? model.transform.Find(kv.Key + "_LOD2") : null;
+                var lodSrc = spec.lod > 0f ? FindPart(kv.Key + "_LOD1") : null;
+                var lod2Src = spec.lod2 > 0f ? FindPart(kv.Key + "_LOD2") : null;
                 inst.prototypes.Add(new InstancePrototype
                 {
                     name = kv.Key,
@@ -407,8 +415,8 @@ namespace Offroad.EditorTools
             var lod = go.AddComponent<LODGroup>();
             lod.SetLODs(renderers.ToArray());
             lod.fadeMode = LODFadeMode.None;
-            Directory.CreateDirectory($"{PrefabDir}/Formations");
-            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Formations/{name}.prefab");
+            Directory.CreateDirectory($"{PrefabDir}/Formations/{Region}");
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Formations/{Region}/{name}.prefab");
             Object.DestroyImmediate(go);
             return prefab;
         }
@@ -524,7 +532,7 @@ namespace Offroad.EditorTools
         static void CreateWater(Terrain terrain, RegionInfo info)
         {
             var root = new GameObject("Water").transform;
-            var mat = MaterialLibrary.Water();
+            var mat = MaterialLibrary.Water($"Water_{P.title}", P.waterShallow, P.waterDeep, P.waterClarity);
             float ty = terrain.transform.position.y;
             Vector3 fallsPos = info.falls != null ? new Vector3(info.falls.x, 0f, info.falls.z) : Vector3.zero;
 
@@ -550,7 +558,7 @@ namespace Offroad.EditorTools
                         int i2 = Mathf.Min(i + 4, n - 1), i0 = Mathf.Max(i - 4, 0);
                         float drop = (r.level[i0] - r.level[i2]) / Mathf.Max(dist[i2] - dist[i0], 1f);
                         float turb = Mathf.Clamp01((10f - r.halfWidth[i]) / 6f * 0.6f + drop * 25f);
-                        float foam = Mathf.Clamp01(1f - dist[i] / 45f);           // churned water below the falls
+                        float foam = info.falls != null && info.falls.top > 0f ? Mathf.Clamp01(1f - dist[i] / 45f) : 0f;   // churned water below the falls
                         for (int s = 0; s < Across; s++)
                         {
                             float lat = Mathf.Lerp(-reach, reach, s / (Across - 1f));
@@ -758,8 +766,8 @@ namespace Offroad.EditorTools
             else lod.SetLODs(new[] { new LOD(kind.cullHeight, new Renderer[] { mr }) });
             lod.fadeMode = LODFadeMode.None;
 
-            Directory.CreateDirectory($"{PrefabDir}/Props");
-            var path = $"{PrefabDir}/Props/{name}.prefab";
+            Directory.CreateDirectory($"{PrefabDir}/Props/{Region}");
+            var path = $"{PrefabDir}/Props/{Region}/{name}.prefab";
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
             Object.DestroyImmediate(go);
             return prefab;
@@ -767,7 +775,7 @@ namespace Offroad.EditorTools
 
         // ------------------------------------------------------------------ landmarks
 
-        static readonly HashSet<string> SmallLandmarkPieces = new HashSet<string> { "FireRing", "Crates", "Signpost", "Tent", "Cairn" };
+        static readonly HashSet<string> SmallLandmarkPieces = new HashSet<string> { "FireRing", "Crates", "Signpost", "Tent", "Cairn", "SummitSign", "OreCart", "Rails" };
 
         static void PlaceLandmarks(Terrain terrain, RegionInfo info)
         {
@@ -844,8 +852,8 @@ namespace Offroad.EditorTools
             var lod = go.AddComponent<LODGroup>();
             lod.SetLODs(new[] { new LOD(small ? 0.01f : 0.0012f, renderers.ToArray()) });
             lod.fadeMode = LODFadeMode.None;
-            Directory.CreateDirectory($"{PrefabDir}/Landmarks");
-            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Landmarks/{name}.prefab");
+            Directory.CreateDirectory($"{PrefabDir}/Landmarks/{Region}");
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{PrefabDir}/Landmarks/{Region}/{name}.prefab");
             Object.DestroyImmediate(go);
             return prefab;
         }

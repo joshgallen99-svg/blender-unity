@@ -96,6 +96,8 @@ namespace Offroad.Vehicles
         [Header("Soft ground")]
         [Tooltip("How far tyres settle into wet mud (m).")]
         public float mudSinkDepth = 0.11f;
+        [Tooltip("How far wheels sink into deep snow (m).")]
+        public float snowSinkDepth = 0.17f;
         [Tooltip("How fast quicksand swallows a slow or stopped vehicle (m/s).")]
         public float quicksandSinkRate = 0.09f;
         [Tooltip("Below this speed (m/s) quicksand pulls the vehicle down; above it the tyres climb back out.")]
@@ -414,7 +416,7 @@ namespace Offroad.Vehicles
                 w.quickSink = Mathf.Clamp(w.quickSink + pull * w.surface.quicksand * dt, 0f, quicksandMaxSink);
             }
             else w.quickSink = Mathf.MoveTowards(w.quickSink, 0f, 0.6f * dt);
-            float target = w.surface.sink + w.surface.mud * mudSinkDepth + w.quickSink;
+            float target = w.surface.sink + w.surface.mud * mudSinkDepth + w.surface.snow * snowSinkDepth + w.quickSink;
             w.sink = Mathf.MoveTowards(w.sink, target, 0.5f * dt);
             if (w.surface.washboard > 0.01f) w.washPhase += Mathf.Abs(w.forwardSpeed) * dt / washboardSpacing;
         }

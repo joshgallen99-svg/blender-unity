@@ -25,11 +25,12 @@ namespace Offroad.Game
     {
         public const string Desert = "desert";
         public const string Forest = "forest";
+        public const string Alpine = "alpine";
 
-        public static string Title(string id) => id == Forest ? "Cedar Hollow" : "Fire Canyon";
-        public static string Subtitle(string id) => id == Forest ? "Forest river valley" : "Desert canyon country";
-        public static string Scene(string id) => id == Forest ? "Forest" : "Prototype";
-        public static readonly string[] Order = { Desert, Forest };
+        public static string Title(string id) => id switch { Forest => "Cedar Hollow", Alpine => "Highline Pass", _ => "Fire Canyon" };
+        public static string Subtitle(string id) => id switch { Forest => "Forest river valley", Alpine => "High alpine pass", _ => "Desert canyon country" };
+        public static string Scene(string id) => id switch { Forest => "Forest", Alpine => "Alpine", _ => "Prototype" };
+        public static readonly string[] Order = { Desert, Forest, Alpine };
     }
 
     public static class Missions
@@ -112,6 +113,43 @@ namespace Offroad.Game
             {
                 id = "roam_forest", title = "Free Roam", reward = 0, freeRoam = true, region = Regions.Forest, camp = "trailhead",
                 brief = "No objectives. Explore Cedar Hollow: the river, the domes and the deep woods.",
+                tip = "Every new landmark is worth 150 scrap.",
+                targets = Array.Empty<string>(),
+            },
+
+            // ---- Highline Pass (alpine)
+            new MissionDef
+            {
+                id = "hut", title = "Hut Supply Run", reward = 300, returnToCamp = true, region = Regions.Alpine, camp = "trailhead",
+                brief = "Drive up the valley to the Stone Hut on the shore of Glacier Tarn and back down to the trailhead.",
+                tip = "One ford on the way up: the meltwater stream is cold but shallow. Slushy puddles further up.",
+                targets = new[] { "stone_hut" },
+            },
+            new MissionDef
+            {
+                id = "pass", title = "Over the Top", reward = 450, region = Regions.Alpine, camp = "trailhead",
+                brief = "Climb the switchbacks above the tarn, through the snowfields, to the cairns on Highline Pass.",
+                tip = "Drifts lie across the upper track: mud tyres bite in deep snow, and the ice patches punish heavy feet.",
+                targets = new[] { "stone_hut", "highline_pass" },
+            },
+            new MissionDef
+            {
+                id = "mine", title = "Silver Rush", reward = 350, returnToCamp = true, region = Regions.Alpine, camp = "trailhead",
+                brief = "Find the old silver mine on the western scree slopes, then report back to camp.",
+                tip = "The mine track is steep loose scree. All-terrains are fine; keep it slow and steady.",
+                targets = new[] { "silver_mine" },
+            },
+            new MissionDef
+            {
+                id = "station", title = "Weather Watch", reward = 300, region = Regions.Alpine, camp = "trailhead",
+                brief = "Check the weather station on its knoll east of the valley, then go and see the Frozen Tarn below the pass.",
+                tip = "Sheet ice on the frozen tarn: it's a rink. Go gently.",
+                targets = new[] { "weather_station", "frozen_tarn" },
+            },
+            new MissionDef
+            {
+                id = "roam_alpine", title = "Free Roam", reward = 0, freeRoam = true, region = Regions.Alpine, camp = "trailhead",
+                brief = "No objectives. Explore Highline Pass: the tarns, the scree, the snowfields and the peaks.",
                 tip = "Every new landmark is worth 150 scrap.",
                 targets = Array.Empty<string>(),
             },

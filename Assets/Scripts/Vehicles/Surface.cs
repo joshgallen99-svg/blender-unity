@@ -16,6 +16,8 @@ namespace Offroad.Vehicles
         public float washboard;  // 0..1 corrugations: rattles the suspension, costs grip at speed
         public float sink;       // how far a tyre settles into this ground at rest (m): sand, soft soil
         public float water;      // depth of water over the ground here (m): rivers, fords, lakes
+        public float snow;       // 0..1 deep snow: wheels sink and plough, sticky like mud
+        public float ice;        // 0..1 sheet ice: very little grip
 
         public static readonly SurfaceInfo Default = new SurfaceInfo
         {
@@ -35,6 +37,8 @@ namespace Offroad.Vehicles
             washboard = Mathf.Lerp(a.washboard, b.washboard, t),
             sink = Mathf.Lerp(a.sink, b.sink, t),
             water = Mathf.Lerp(a.water, b.water, t),
+            snow = Mathf.Lerp(a.snow, b.snow, t),
+            ice = Mathf.Lerp(a.ice, b.ice, t),
         };
     }
 
@@ -53,7 +57,7 @@ namespace Offroad.Vehicles
         {
             float total = s.layers.x + s.layers.y + s.layers.z + s.layers.w;
             float fit = total > 1e-3f ? Vector4.Dot(s.layers, grip) / total : 1f;
-            float wet = Mathf.Clamp01(s.mud + s.quicksand);
+            float wet = Mathf.Clamp01(s.mud + s.quicksand + s.snow * 0.8f);   // chunky mud tyres also bite in snow
             return Mathf.Lerp(fit, mudGrip > 0f ? mudGrip : 1f, wet);
         }
 
