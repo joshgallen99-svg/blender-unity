@@ -29,6 +29,12 @@ namespace Offroad.Core
         public static bool PhotoPressed { get; private set; }
         /// <summary>Photo-mode zoom: Q (in) / E (out).</summary>
         public static float Zoom { get; private set; }
+        /// <summary>Manual gearbox: shift up / down this frame (Left Shift / Left Ctrl, gamepad RB / LB).</summary>
+        public static int Shift { get; private set; }
+        /// <summary>Toggle Auto / Manual gearbox (M, gamepad left-stick click).</summary>
+        public static bool GearModePressed { get; private set; }
+        /// <summary>Winch button (F, gamepad right-stick click): held state.</summary>
+        public static bool Winch { get; private set; }
         public static bool UsingGamepad { get; private set; }
 
         static int _lastFrame = -1;
@@ -49,6 +55,9 @@ namespace Offroad.Core
             float zoom = 0f;
             Vector2 look = Vector2.zero;
             bool pad = false;
+            int shift = 0;
+            bool gearMode = false;
+            bool winch = false;
 
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
@@ -67,6 +76,10 @@ namespace Offroad.Core
                 confirm = kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
                 garage = kb.gKey.wasPressedThisFrame;
                 tour = kb.f9Key.wasPressedThisFrame;
+                if (kb.leftShiftKey.wasPressedThisFrame) shift = 1;
+                if (kb.leftCtrlKey.wasPressedThisFrame) shift = -1;
+                gearMode = kb.mKey.wasPressedThisFrame;
+                winch = kb.fKey.isPressed;
                 photo = kb.f2Key.wasPressedThisFrame;
                 if (kb.qKey.isPressed) zoom -= 1f;
                 if (kb.eKey.isPressed) zoom += 1f;
@@ -94,6 +107,10 @@ namespace Offroad.Core
                 any |= gp.buttonSouth.wasPressedThisFrame || gp.startButton.wasPressedThisFrame;
                 confirm |= gp.buttonSouth.wasPressedThisFrame;
                 garage |= gp.selectButton.wasPressedThisFrame;
+                if (gp.rightShoulder.wasPressedThisFrame) shift = 1;
+                if (gp.leftShoulder.wasPressedThisFrame) shift = -1;
+                gearMode |= gp.leftStickButton.wasPressedThisFrame;
+                winch |= gp.rightStickButton.isPressed;
                 if (gp.dpad.up.wasPressedThisFrame) nav = -1;
                 if (gp.dpad.down.wasPressedThisFrame) nav = 1;
             }
@@ -111,6 +128,10 @@ namespace Offroad.Core
             confirm = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
             garage = Input.GetKeyDown(KeyCode.G);
             tour = Input.GetKeyDown(KeyCode.F9);
+            if (Input.GetKeyDown(KeyCode.LeftShift)) shift = 1;
+            if (Input.GetKeyDown(KeyCode.LeftControl)) shift = -1;
+            gearMode = Input.GetKeyDown(KeyCode.M);
+            winch = Input.GetKey(KeyCode.F);
             photo = Input.GetKeyDown(KeyCode.F2);
             if (Input.GetKey(KeyCode.Q)) zoom -= 1f;
             if (Input.GetKey(KeyCode.E)) zoom += 1f;
@@ -138,6 +159,9 @@ namespace Offroad.Core
             NavVertical = nav;
             PhotoPressed = photo;
             Zoom = zoom;
+            Shift = shift;
+            GearModePressed = gearMode;
+            Winch = winch;
             UsingGamepad = pad || (UsingGamepad && look == Vector2.zero && throttle == 0 && steer == 0);
         }
     }

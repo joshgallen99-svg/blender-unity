@@ -28,6 +28,9 @@ namespace Offroad.UI
         const float TextInterval = 0.125f;
         static readonly string[] SurfaceNames = { "SAND", "GRAVEL", "DIRT", "ROCK", "MUD", "QUICKSAND", "WASHBOARD", "WATER", "SNOW", "DEEP SNOW", "ICE" };
         static readonly string[] Numbers = BuildNumbers(400);
+        Winch _winch;
+        static readonly string[] GearNames = { "N", "1", "2", "3", "4", "5", "6" };
+        static readonly string[] AutoGearNames = { "N", "D1", "D2", "D3", "D4", "D5", "D6" };
         readonly List<(float d, Landmark l)> _nearby = new List<(float, Landmark)>();
         readonly Vector3[] _markerTarget = new Vector3[8];
         readonly bool[] _markerObjective = new bool[8];
@@ -126,7 +129,7 @@ namespace Offroad.UI
             _spare.Add(bar);
             Root.Add(_spare);
 
-            _hint = UIKit.Label("W/S drive & brake  ·  A/D steer  ·  Space handbrake  ·  R reset  ·  T swap to spare  ·  Esc pause", "hint", "anim");
+            _hint = UIKit.Label("W/S drive & brake  ·  A/D steer  ·  Space handbrake  ·  M auto/manual  ·  Shift/Ctrl gears  ·  F winch  ·  R recover  ·  T swap to spare  ·  Esc pause", "hint", "anim");
             Root.Add(_hint);
             _warning = UIKit.Label("", "hazard-warning", "anim");
             Root.Add(_warning);
@@ -153,13 +156,14 @@ namespace Offroad.UI
             var v = _ui.vehicle;
             var runner = _ui.runner;
             if (!v) return;
+            if (_winch == null || _winch.gameObject != v.gameObject) _winch = v.GetComponent<Winch>();
 
             float kmh = Mathf.Abs(v.ForwardSpeed) * 3.6f;
             int kmhInt = Mathf.Clamp(Mathf.RoundToInt(kmh), 0, Numbers.Length - 1);
             if (kmhInt != _lastKmh) { _lastKmh = kmhInt; _speed.text = Numbers[kmhInt]; }
-            _gauge.value = Mathf.Lerp(_gauge.value, kmh / 130f, 0.25f);
+            _gauge.value = Mathf.Lerp(_gauge.value, kmh / 180f, 0.25f);
             _gauge.MarkDirtyRepaint();
-            SetText(_gear, v.IsReversing ? "R" : kmh < 1f ? "N" : "D");
+            SetText(_gear, v.IsReversing ? "R" : v.manual ? (v.LowRange ? "1L" : GearNames[Mathf.Clamp(v.Gear, 0, GearNames.Length - 1)]) : kmh < 1f ? "N" : AutoGearNames[Mathf.Clamp(v.Gear, 0, AutoGearNames.Length - 1)]);
             _textTimer += Time.unscaledDeltaTime;
             bool refreshText = _textTimer >= TextInterval;
             if (refreshText) _textTimer = 0f;
@@ -239,7 +243,24 @@ namespace Offroad.UI
 
             // Sinking warning.
             bool sinking = v.QuicksandSink > 0.08f;
-            if (sinking)
+            if (v.RecoverRefusal != null && Time.time - v.RecoverRefusedAt < 2f)
+            {
+                SetText(_warning, v.RecoverRefusal.ToUpperInvariant());
+                _warning.AddToClassList("shown");
+            }
+            else if (v.TipRisk > 0.72f && v.GroundedWheels > 0)
+            {
+                SetText(_warning, v.TipRisk > 0.92f ? "TIPPING OVER  ·  steer downhill!" : "OFF-CAMBER  ·  wheels lifting, ease off");
+                _warning.AddToClassList("shown");
+            }
+            else if (_winch && _winch.Attached)
+            {
+                SetText(_warning, _winch.Tension > _winch.ratedPull * 0.97f ? "WINCH STALLED  ·  give it some throttle"
+                    : _winch.Reeling ? "WINCHING" : _winch.PortableAnchor ? "PORTABLE ANCHOR  ·  hold F to reel, tap F to release"
+                    : "WINCH HOOKED  ·  hold F to reel, tap F to release");
+                _warning.AddToClassList("shown");
+            }
+            else if (sinking)
             {
                 SetText(_warning, v.QuicksandSink > 0.3f ? "STUCK IN QUICKSAND  ·  press R to winch out" : "QUICKSAND  ·  keep moving!");
                 _warning.AddToClassList("shown");

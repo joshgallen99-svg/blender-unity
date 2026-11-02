@@ -199,13 +199,67 @@ public class VehiclePhysicsTests
     }
 
     [UnityTest]
-    public IEnumerator RightsItselfWhenUpsideDown()
+    public IEnumerator StaysOnItsRoofUntilRecovered()
     {
         MakeGround();
         var go = new GameObject("TestVehicle");
         go.transform.SetPositionAndRotation(new Vector3(0f, 2.5f, 0f), Quaternion.Euler(0f, 0f, 180f));
         _vehicle = VehicleRig.Assemble(go);
-        yield return Run(6f);
-        Assert.Greater(Vector3.Dot(_vehicle.transform.up, Vector3.up), 0.9f, "auto-right should flip it back");
+        yield return Run(5f);
+        Assert.Less(Vector3.Dot(_vehicle.transform.up, Vector3.up), 0f, "no auto-righting");
+        Assert.IsTrue(_vehicle.ResetUpright());
+        Assert.That(_vehicle.transform.position.y, Is.InRange(0f, 0.3f), "recovery puts it just above the ground");
+        yield return Run(2f);
+        Assert.Greater(Vector3.Dot(_vehicle.transform.up, Vector3.up), 0.99f);
+        Assert.AreEqual(4, _vehicle.GroundedWheels);
+    }
+
+    [UnityTest]
+    public IEnumerator RecoverySpamCannotLaunchTheVehicle()
+    {
+        MakeGround();
+        MakeVehicle();
+        yield return Run(1f);
+        float maxY = 0f;
+        for (int i = 0; i < 150; i++)
+        {
+            _vehicle.ResetUpright();
+            yield return new WaitForFixedUpdate();
+            maxY = Mathf.Max(maxY, _vehicle.transform.position.y);
+        }
+        Assert.Less(maxY, 0.4f, "spamming R must not lift the vehicle");
+        _vehicle.controls = new VehicleControls { throttle = 1f };
+        yield return Run(2f);
+        Assert.IsFalse(_vehicle.ResetUpright(), "refused while upright and driving");
+    }
+
+    [UnityTest]
+    public IEnumerator LowRangeCrawlsUpASteepSlope()
+    {
+        MakeGround(38f);
+        MakeVehicle();
+        _vehicle.SetManual(true);   // manual 1st = low range
+        yield return Run(1f);
+        Vector3 start = _vehicle.transform.position;
+        _vehicle.controls = new VehicleControls { throttle = 1f };
+        yield return Run(8f);
+        float climbed = Vector3.Dot(_vehicle.transform.position - start, _ground.transform.forward);
+        Debug.Log($"Low range on 38 deg: climbed {climbed:0.0} m, rpm {_vehicle.EngineRpm:0}");
+        Assert.IsTrue(_vehicle.LowRange);
+        Assert.Greater(climbed, 8f, "low range should crawl up a 38 degree slope");
+    }
+
+    [UnityTest]
+    public IEnumerator AutoGearboxReachesHighSpeed()
+    {
+        MakeGround();
+        _ground.transform.localScale = new Vector3(60f, 1f, 2400f);   // long straight
+        MakeVehicle();
+        yield return Run(1f);
+        _vehicle.controls = new VehicleControls { throttle = 1f };
+        yield return Run(20f);
+        Debug.Log($"After 20 s: {_vehicle.ForwardSpeed * 3.6f:0} km/h in gear {_vehicle.Gear}");
+        Assert.Greater(_vehicle.ForwardSpeed, 38f, "should pass ~137 km/h");
+        Assert.GreaterOrEqual(_vehicle.Gear, 4);
     }
 }

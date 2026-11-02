@@ -19,8 +19,6 @@ namespace Offroad.Vehicles
         public event Action Assembled;
 
         const float BaseMass = 1800f;
-        const float BasePower = 165000f;
-        const float BaseTraction = 13500f;
 
         OffroadVehicle _vehicle;
         Material _paint;
@@ -97,6 +95,26 @@ namespace Offroad.Vehicles
                 v.wheels[i].restPosition = a.wheelPositions[i];
                 if (v.wheels[i].visual) v.wheels[i].visual.localPosition = a.wheelPositions[i];
             }
+            // Solid axles, links and coilovers (crawler), posed every frame from the wheels.
+            var axles = GetComponent<SolidAxleVisuals>();
+            if (a.solidAxles && art.axleHousing != null && art.axleHousing.mesh != null)
+            {
+                if (!axles) axles = gameObject.AddComponent<SolidAxleVisuals>();
+                axles.housing = art.axleHousing.mesh;
+                axles.housingMaterials = art.axleHousing.materials;
+                axles.link = art.link.mesh;
+                axles.linkMaterials = art.link.materials;
+                axles.coilover = art.coilover.mesh;
+                axles.coiloverMaterials = art.coilover.materials;
+                axles.Build();
+            }
+            else if (axles)
+            {
+                var susp = transform.Find("Suspension");
+                if (susp) Kill(susp.gameObject);
+                if (Application.isPlaying) Destroy(axles); else DestroyImmediate(axles);
+            }
+
             var spare = Child(transform, "Spare");
             spare.transform.localPosition = a.spareMount;
             spare.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);   // show face to the rear
@@ -139,11 +157,9 @@ namespace Offroad.Vehicles
             v.centerOfMass = body.centerOfMass + (l.Fitted("RoofRack") ? new Vector3(0f, 0.04f, 0f) : Vector3.zero);
             if (rb) rb.centerOfMass = v.centerOfMass;
             float massRatio = mass / BaseMass;
-            v.enginePower = BasePower * massRatio * (1f + 0.12f * l.engineLevel);
-            v.maxTractiveForce = BaseTraction * massRatio * (1f + 0.08f * l.engineLevel);
-            v.topSpeed = 34f + 1.2f * l.engineLevel;
-            v.suspensionTravel = 0.32f + 0.03f * l.suspensionLevel;
-            v.antiRoll = 0.85f + 0.15f * l.suspensionLevel;
+            v.torqueScale = massRatio * (1f + 0.1f * l.engineLevel);
+            v.suspensionTravel = 0.5f + 0.04f * l.suspensionLevel;
+            v.antiRoll = Mathf.Max(0.15f, 0.3f - 0.05f * l.suspensionLevel);   // better suspension: more flex
             v.maxSteerAngle = body.steerAngle;
         }
 

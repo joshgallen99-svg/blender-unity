@@ -90,7 +90,7 @@ namespace Offroad.UI
                                    "Medium targets 60 FPS on an M-series MacBook Air.", "small");
             help.style.whiteSpace = WhiteSpace.Normal;
             _panel.Add(help);
-            _panel.Add(UIKit.Label("Drive W/S · Steer A/D · Handbrake Space · Reset R · Spare T · Look mouse · F1 FPS", "small"));
+            _panel.Add(UIKit.Label("Drive W/S · Steer A/D · Handbrake Space · Auto/Manual M · Gears Shift/Ctrl (manual 1st = low range) · Winch F (hold to reel) · Recover R · Spare T · Look mouse · F1 FPS", "small"));
         }
 
         static void Row(VisualElement parent, string name, string value, Action<int> change)

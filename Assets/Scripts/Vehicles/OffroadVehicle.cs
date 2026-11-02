@@ -51,6 +51,7 @@ namespace Offroad.Vehicles
             [NonSerialized] public float sink;           // how far the tyre has sunk into soft ground (m)
             [NonSerialized] public float quickSink;      // the quicksand part of it, which builds up over time
             [NonSerialized] public float washPhase;      // distance rolled over corrugations, in wavelengths
+            [NonSerialized] public bool sliding;         // broken loose: on sliding grip until it hooks up again
         }
 
         [Header("Wheels")]
@@ -61,19 +62,41 @@ namespace Offroad.Vehicles
 
         [Header("Suspension")]
         [Tooltip("Total wheel travel in metres.")]
-        public float suspensionTravel = 0.32f;
+        public float suspensionTravel = 0.5f;
         [Tooltip("Fraction of travel used up when standing still.")]
-        [Range(0.2f, 0.7f)] public float restCompression = 0.45f;
+        [Range(0.2f, 0.7f)] public float restCompression = 0.4f;
         [Range(0.05f, 1.5f)] public float bumpDamping = 0.35f;     // damping ratios (1 = critical)
         [Range(0.05f, 1.5f)] public float reboundDamping = 0.55f;
-        [Tooltip("Anti-roll stiffness as a multiple of the spring rate.")]
-        public float antiRoll = 0.85f;
+        [Tooltip("Sway-bar stiffness as a multiple of the spring rate. Disconnected in low range so the axles can flex.")]
+        public float antiRoll = 0.3f;
+
+        [Header("Engine")]
+        [Tooltip("Peak engine torque (N m). The curve rises from idle, holds through the mid range and falls toward redline.")]
+        public float peakTorque = 520f;
+        public float idleRpm = 850f;
+        public float redlineRpm = 4800f;
+        [Tooltip("Engine braking at redline, as a fraction of peak torque.")]
+        public float engineBraking = 0.18f;
+
+        [Header("Gearbox")]
+        public float[] gearRatios = { 4.06f, 2.39f, 1.52f, 1.0f, 0.79f };
+        public float reverseRatio = 3.8f;
+        public float finalDrive = 4.1f;
+        [Tooltip("Transfer-case low range, engaged in manual 1st: the crawl gear.")]
+        public float lowRangeRatio = 2.72f;
+        public float drivetrainEfficiency = 0.85f;
+        public float shiftTime = 0.22f;
+        public float autoUpshiftRpm = 4100f;
+        public float autoDownshiftRpm = 1700f;
+        [Tooltip("Manual gearbox: the player picks gears; 1st is low range.")]
+        public bool manual;
+        [Tooltip("Aerodynamic drag area (Cd x frontal area, m^2).")]
+        public float dragArea = 1.9f;
 
         [Header("Drivetrain")]
-        public float enginePower = 165000f;      // watts at the wheels
-        public float maxTractiveForce = 13500f;  // newtons, all wheels
-        public float topSpeed = 34f;             // m/s (~122 km/h)
-        public float reverseTopSpeed = 9f;
+        [Tooltip("Garage engine upgrades scale the torque by this.")]
+        public float torqueScale = 1f;
+        public float reverseTopSpeed = 12f;
         public float brakeForce = 9000f;         // per wheel
         public float rollingResistance = 30f;    // N per m/s per wheel
         [Tooltip("Seconds the brake must be held at a standstill before reverse engages.")]
@@ -84,8 +107,12 @@ namespace Offroad.Vehicles
         public float tireGrip = 1.05f;           // friction coefficient on a neutral surface
         [Range(0, 1)] public float lateralStiffness = 0.82f;
         [Range(0, 1)] public float handbrakeRearGrip = 0.35f;
+        [Tooltip("Grip once a tyre breaks loose, as a fraction of peak: below 1 lets a slide carry on into a drift.")]
+        [Range(0.5f, 1f)] public float slidingGrip = 0.8f;
+        [Tooltip("How much grip per newton falls as load rises (0 = none). Weight transfer then costs grip, as on real tyres.")]
+        [Range(0f, 0.4f)] public float loadSensitivity = 0.15f;
         [Tooltip("Height above the contact patch where tyre forces act (lower = more body roll).")]
-        public float tireForceHeight = 0.3f;
+        public float tireForceHeight = 0.12f;
 
         [Header("Steering")]
         public float maxSteerAngle = 34f;
@@ -110,10 +137,11 @@ namespace Offroad.Vehicles
         public float fordingDepth = 0.85f;
 
         [Header("Stability")]
-        public Vector3 centerOfMass = new Vector3(0f, 0.58f, 0.05f);
-        public float downforce = 2.5f;
-        public float airControl = 2.2f;          // rad/s^2
-        public float autoRightDelay = 2.5f;
+        public Vector3 centerOfMass = new Vector3(0f, 0.72f, 0.05f);
+        public float downforce = 0.4f;
+        public float airControl = 0.6f;          // rad/s^2
+        [Tooltip("Seconds between recoveries (R).")]
+        public float recoverCooldown = 3f;
 
         public VehicleControls controls;
         public ISurfaceProvider surfaceProvider;
@@ -131,13 +159,23 @@ namespace Offroad.Vehicles
         /// <summary>Deepest water under any wheel (m).</summary>
         public float WaterDepth { get; private set; }
         public bool Flooded => WaterDepth > fordingDepth;
+        /// <summary>Current gear: -1 reverse, 0 neutral (shifting), 1.. forward.</summary>
+        public int Gear { get; private set; } = 1;
+        public float EngineRpm { get; private set; }
+        /// <summary>Transfer case in low range (manual 1st): crawl gearing, sway bars disconnected.</summary>
+        public bool LowRange => manual && Gear == 1;
+        /// <summary>0..1 how close the vehicle is to tipping over sideways or end-over-end.</summary>
+        public float TipRisk { get; private set; }
+        public int GearCount => gearRatios.Length;
 
         const float CastLift = 0.3f;              // start casts above the travel so close ground is not missed
         static readonly RaycastHit[] Hits = new RaycastHit[16];
 
         float _steerInput;
         float _brakeHeldAtStop;
-        float _upsideDownTime;
+        float _shiftTimer;
+        int _manualGear = 1;
+        float _lastRecover = -100f;
         Vector3 _spawnPosition;
         Quaternion _spawnRotation;
         Vector3 _safePosition;
@@ -206,15 +244,16 @@ namespace Offroad.Vehicles
                 Body.AddForceAtPosition(up * force, WheelCenterWorld(w));
             }
 
-            ApplyAntiRoll(up);
+            if (!LowRange) ApplyAntiRoll(up);
 
-            // ---- Drivetrain request.
-            float driveTotal = 0f, brakeAmount = 0f;
+            // ---- Drivetrain request: pedals pick drive / brake / reverse, the gearbox and engine
+            // curve turn throttle into wheel force.
+            float brakeAmount = 0f, throttle = 0f;
             IsReversing = false;
             if (controls.throttle > 0.01f)
             {
                 if (ForwardSpeed < -0.8f) brakeAmount = controls.throttle;
-                else driveTotal = controls.throttle * TractiveForce(ForwardSpeed, topSpeed);
+                else throttle = controls.throttle;
             }
             if (controls.brake > 0.01f)
             {
@@ -228,7 +267,7 @@ namespace Offroad.Vehicles
                     _brakeHeldAtStop += dt;
                     if (_brakeHeldAtStop >= reverseDelay || ForwardSpeed < -0.3f)
                     {
-                        driveTotal = -controls.brake * TractiveForce(-ForwardSpeed, reverseTopSpeed) * 0.7f;
+                        throttle = controls.brake;
                         IsReversing = true;
                     }
                     else brakeAmount = Mathf.Max(brakeAmount, controls.brake);
@@ -236,6 +275,7 @@ namespace Offroad.Vehicles
             }
             else _brakeHeldAtStop = 0f;
             bool idle = controls.throttle <= 0.01f && controls.brake <= 0.01f;
+            float driveTotal = Drivetrain(throttle, dt);
             if (Flooded) driveTotal *= 0.2f;                 // water in the intake: barely any power
 
             // ---- Tyre forces.
@@ -282,7 +322,12 @@ namespace Offroad.Vehicles
                 float latGrip = lateralStiffness * (handbraked ? handbrakeRearGrip : 1f);
                 float fLat = -(vLat / dt + gLat) * massShare * latGrip;
 
-                float limit = grip * w.load;
+                // Load sensitivity: a tyre carrying more than its share grips proportionally less, so
+                // weight transfer in a corner costs total grip. Once broken loose the tyre runs on
+                // sliding grip until the demand falls back well inside it: that is what holds a drift.
+                float nominal = mass * g / count;
+                float muLoad = Mathf.Clamp(1f - loadSensitivity * (w.load / nominal - 1f), 0.6f, 1.25f);
+                float limit = grip * muLoad * w.load * (w.sliding ? slidingGrip : 1f);
                 Vector2 f = new Vector2(fLong, fLat);
                 float mag = f.magnitude;
                 w.slip = 0f;
@@ -290,13 +335,17 @@ namespace Offroad.Vehicles
                 {
                     w.slip = Mathf.Clamp01((mag - limit) / Mathf.Max(limit, 1f));
                     f *= limit / mag;
+                    if (mag > limit * 1.08f && Mathf.Abs(vLat) > 1.2f) w.sliding = true;
                 }
+                else if (mag < limit * 0.85f || Mathf.Abs(vLat) < 0.6f) w.sliding = false;
 
                 Vector3 at = w.contactPoint + up * tireForceHeight;
                 Body.AddForceAtPosition(fwd * f.x + right * f.y, at);
             }
 
-            // ---- Helpers.
+            // ---- Aero and a touch of air control. No auto-righting: a rollover is yours to recover.
+            Vector3 vel = Body.linearVelocity;
+            Body.AddForce(-0.5f * 1.2f * dragArea * vel.magnitude * vel);
             if (GroundedWheels >= 2)
                 Body.AddForce(-up * downforce * ForwardSpeed * ForwardSpeed);
             if (GroundedWheels == 0)
@@ -305,8 +354,112 @@ namespace Offroad.Vehicles
                                  - transform.forward * controls.steer * airControl;
                 Body.AddTorque(torque, ForceMode.Acceleration);
             }
-            CheckAutoRight(dt);
+            if (transform.position.y < -100f) Respawn();
+            UpdateTipRisk();
             TrackSoftGround(dt);
+        }
+
+        /// <summary>Static stability: how far the centre of mass has leaned toward the line between the
+        /// downhill wheels. 1 = over the tipping point.</summary>
+        void UpdateTipRisk()
+        {
+            float halfTrack = 0f, halfBase = 0f;
+            foreach (var w in wheels)
+            {
+                halfTrack = Mathf.Max(halfTrack, Mathf.Abs(w.restPosition.x));
+                halfBase = Mathf.Max(halfBase, Mathf.Abs(w.restPosition.z));
+            }
+            float h = Mathf.Max(0.2f, centerOfMass.y);
+            // Lean angles relative to gravity, against the static tipping angles atan(halfTrack / h).
+            Vector3 gLocal = transform.InverseTransformDirection(Vector3.down);
+            float roll = Mathf.Atan2(Mathf.Abs(gLocal.x), -gLocal.y);
+            float pitch = Mathf.Atan2(Mathf.Abs(gLocal.z), -gLocal.y);
+            if (gLocal.y >= 0f) { TipRisk = 1f; return; }
+            float rollRisk = roll / Mathf.Atan2(halfTrack, h);
+            float pitchRisk = pitch / Mathf.Atan2(halfBase, h);
+            int lifted = 0;
+            foreach (var w in wheels) if (!w.grounded) lifted++;
+            TipRisk = Mathf.Clamp01(Mathf.Max(rollRisk, pitchRisk) + (GroundedWheels > 0 ? lifted * 0.08f : 0f));
+        }
+
+        /// <summary>Manual gearbox: shift up / down (1st is low range). Ignored in automatic.</summary>
+        public void ShiftManual(int delta)
+        {
+            if (!manual) return;
+            _manualGear = Mathf.Clamp(_manualGear + delta, 1, gearRatios.Length);
+            _shiftTimer = shiftTime;
+        }
+
+        public void SetManual(bool on)
+        {
+            if (manual == on) return;
+            manual = on;
+            // Pick up in a sensible gear: in manual from the gear auto was using (never straight into low range at speed).
+            _manualGear = Mathf.Clamp(Gear < 1 ? 1 : Gear, ForwardSpeed > 6f ? 2 : 1, gearRatios.Length);
+        }
+
+        float TorqueCurve(float rpm)
+        {
+            // Turbo-diesel-like: strong from just off idle, flat mid range, tailing off to redline.
+            float r = Mathf.Clamp(rpm, idleRpm, redlineRpm);
+            if (r < 1900f) return Mathf.Lerp(0.62f, 1f, Mathf.InverseLerp(idleRpm, 1900f, r));
+            if (r < 3500f) return 1f;
+            return Mathf.Lerp(1f, 0.72f, Mathf.InverseLerp(3500f, redlineRpm, r));
+        }
+
+        /// <summary>Picks the gear (auto), works out engine rpm from the driven wheels and returns the total
+        /// longitudinal force at the tyres (newtons, + forward).</summary>
+        float Drivetrain(float throttle, float dt)
+        {
+            float wheelSpeed = 0f;
+            int driven = 0;
+            foreach (var w in wheels) { wheelSpeed += Mathf.Abs(w.grounded ? w.forwardSpeed : w.spinSpeed * wheelRadius); driven++; }
+            wheelSpeed /= Mathf.Max(1, driven);
+            float wheelRpm = wheelSpeed / wheelRadius * 60f / (2f * Mathf.PI);
+
+            int gear;
+            if (IsReversing) gear = -1;
+            else if (manual) gear = _manualGear;
+            else
+            {
+                gear = Mathf.Clamp(Gear < 1 ? 1 : Gear, 1, gearRatios.Length);
+                float rpmNow = wheelRpm * RatioFor(gear);
+                if (_shiftTimer <= 0f)
+                {
+                    if (rpmNow > autoUpshiftRpm && gear < gearRatios.Length && throttle > 0.05f) { gear++; _shiftTimer = shiftTime; }
+                    else if (gear > 1 && wheelRpm * RatioFor(gear - 1) < autoUpshiftRpm * 0.85f && rpmNow < autoDownshiftRpm) { gear--; _shiftTimer = shiftTime * 0.6f; }
+                }
+            }
+            if (gear != Gear && Gear != 0 && gear > 0 && Gear > 0 && _shiftTimer <= 0f) _shiftTimer = shiftTime;
+            Gear = gear;
+            _shiftTimer -= dt;
+
+            float ratio = RatioFor(gear);
+            // Clutch / converter slip below the gear's stall speed keeps the engine above idle.
+            float rpm = Mathf.Max(idleRpm + throttle * 900f * Mathf.Clamp01(1f - wheelRpm * ratio / 1800f), wheelRpm * ratio);
+            EngineRpm = Mathf.Lerp(EngineRpm, Mathf.Min(rpm, redlineRpm * 1.02f), 1f - Mathf.Exp(-12f * dt));
+            if (_shiftTimer > 0f) return 0f;
+
+            float wheelTorque;
+            if (throttle > 0.01f && rpm < redlineRpm)
+                wheelTorque = throttle * peakTorque * torqueScale * TorqueCurve(rpm) * ratio * drivetrainEfficiency;
+            else if (throttle <= 0.01f && wheelSpeed > 0.3f)
+                wheelTorque = -engineBraking * peakTorque * (rpm / redlineRpm) * ratio;   // engine braking: hill descent in low range
+            else wheelTorque = 0f;
+            float force = wheelTorque / wheelRadius;
+            if (gear < 0)
+            {
+                if (-ForwardSpeed > reverseTopSpeed) force = 0f;
+                return throttle > 0.01f ? -force : (ForwardSpeed < 0f ? -force : force);
+            }
+            return ForwardSpeed < 0f && force < 0f ? -force : force;
+        }
+
+        float RatioFor(int gear)
+        {
+            if (gear < 0) return reverseRatio * finalDrive;
+            float r = gearRatios[Mathf.Clamp(gear - 1, 0, gearRatios.Length - 1)] * finalDrive;
+            return manual && gear == 1 ? r * lowRangeRatio : r;
         }
 
         void TrackSoftGround(float dt)
@@ -340,13 +493,6 @@ namespace Offroad.Vehicles
                 _safeRotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(transform.forward, Vector3.up), Vector3.up);
                 _hasSafe = true;
             }
-        }
-
-        float TractiveForce(float speed, float limit)
-        {
-            float s = Mathf.Max(Mathf.Abs(speed), 1f);
-            float f = Mathf.Min(maxTractiveForce, enginePower / s);
-            return f * Mathf.Clamp01((limit - Mathf.Max(speed, 0f)) / 4f);
         }
 
         void UpdateSteering(float dt)
@@ -445,35 +591,49 @@ namespace Offroad.Vehicles
             }
         }
 
-        void CheckAutoRight(float dt)
-        {
-            bool upsideDown = Vector3.Dot(transform.up, Vector3.up) < 0.25f;
-            if (upsideDown && Body.linearVelocity.magnitude < 2.5f) _upsideDownTime += dt;
-            else _upsideDownTime = 0f;
-            if (_upsideDownTime > autoRightDelay) ResetUpright();
-            if (transform.position.y < -100f) Respawn();
-        }
+        /// <summary>Why the last <see cref="ResetUpright"/> was refused, for the HUD; null if it went ahead.</summary>
+        public string RecoverRefusal { get; private set; }
+        public float RecoverRefusedAt { get; private set; } = -100f;
 
-        /// <summary>Lift the vehicle and put it back on its wheels, keeping its heading. If it is stuck in
-        /// quicksand or deep mud, tow it back to the last spot on firm ground instead.</summary>
-        public void ResetUpright()
+        /// <summary>Recovery (R): put the vehicle back on its wheels on the ground below, keeping its heading.
+        /// If it is stuck in quicksand, deep mud or water, tow it back to the last spot on firm ground instead.
+        /// Refused while on cooldown, or while it is upright, on its wheels and moving: it is not stuck.</summary>
+        public bool ResetUpright()
         {
+            RecoverRefusal = null;
+            if (Time.time - _lastRecover < recoverCooldown) { RecoverRefusal = "Recovery cooling down"; RecoverRefusedAt = Time.time; return false; }
             bool stuck = QuicksandSink > 0.2f;
             foreach (var w in wheels) stuck |= w.sink > 0.2f;
             stuck |= Flooded;
+            bool upright = Vector3.Dot(transform.up, Vector3.up) > 0.7f && GroundedWheels >= 3;
+            if (!stuck && upright && Body.linearVelocity.magnitude > 1.5f) { RecoverRefusal = "Stop first to recover"; RecoverRefusedAt = Time.time; return false; }
+            _lastRecover = Time.time;
+
             if (stuck && _hasSafe)
             {
-                Teleport(_safePosition + Vector3.up * 0.6f, _safeRotation);
-                return;
+                Teleport(GroundBelow(_safePosition), _safeRotation);
+                return true;
             }
-            _upsideDownTime = 0f;
             Vector3 fwd = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.ProjectOnPlane(transform.up, Vector3.up);
             if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
-            Vector3 pos = transform.position + Vector3.up * 2f;
-            if (Physics.Raycast(pos + Vector3.up * 50f, Vector3.down, out var hit, 200f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) && hit.collider.attachedRigidbody != Body)
-                pos.y = hit.point.y + 1.2f;
-            Teleport(pos, Quaternion.LookRotation(fwd, Vector3.up));
+            Teleport(GroundBelow(transform.position), Quaternion.LookRotation(fwd, Vector3.up));
+            return true;
+        }
+
+        /// <summary>The ground surface under a point (ignoring this vehicle), plus a small drop clearance.</summary>
+        Vector3 GroundBelow(Vector3 p)
+        {
+            int n = Physics.RaycastNonAlloc(p + Vector3.up * 4f, Vector3.down, Hits, 60f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            Vector3 ground = p;
+            for (int i = 0; i < n; i++)
+            {
+                if (Hits[i].collider.attachedRigidbody == Body) continue;
+                if (Hits[i].distance < best) { best = Hits[i].distance; ground = Hits[i].point; }
+            }
+            return ground + Vector3.up * 0.15f;
         }
 
         public void Respawn() => Teleport(_spawnPosition, _spawnRotation);
@@ -491,8 +651,10 @@ namespace Offroad.Vehicles
             transform.SetPositionAndRotation(position, rotation);
             Body.linearVelocity = Vector3.zero;
             Body.angularVelocity = Vector3.zero;
-            foreach (var w in wheels) { w.spinSpeed = 0; w.sink = 0; w.quickSink = 0; }
+            foreach (var w in wheels) { w.spinSpeed = 0; w.sink = 0; w.quickSink = 0; w.sliding = false; }
             QuicksandSink = 0f;
+            var winch = GetComponent<Winch>();
+            if (winch) winch.Release();
         }
 
         void Update()
