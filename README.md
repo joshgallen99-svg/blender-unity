@@ -29,18 +29,22 @@ Heavy work runs in the cloud: models are generated with Blender's Python module,
 
 ## How it plays
 
-- **Two regions**, each its own scene; pick an expedition anywhere and the game travels there:
+- **Three regions**, each its own scene; pick an expedition anywhere and the game travels there:
   - **Fire Canyon** (desert): an old wagon track up a valley of sandstone formations, side tracks to the
     landmarks, The Wave, dunes, a playa. Hazards: quicksand in the wash near the spring, wet mud,
     washboard corrugations.
   - **Cedar Hollow** (forest river valley): firs, aspens, granite domes, a river with two fords and an
     old timber bridge, a waterfall and plunge lake, switchbacks to a fire lookout, mud holes and a
     beaver-pond bog. Deep water floods the engine.
-- **Soft ground**: tyres press ruts into sand, soil and mud (they stay behind you), and settle into
+  - **Highline Pass** (high alpine): a glacial valley past a turquoise tarn and a stone hut, switchbacks
+    up a cirque wall to a snowy saddle, an old silver mine on the scree, a weather station on a knoll.
+    Hazards: deep snowdrifts (wheels sink and plough), sheet ice (almost no grip), meltwater slush, a ford.
+- **Soft ground**: tyres press ruts into sand, soil, mud and snow (they stay behind you), and settle into
   them; quicksand swallows a slow vehicle; R tows you back to firm ground.
 - **Expeditions**: Fire Canyon has a rock-garden shakedown, the Needle's Eye arch, Prospector's Well, the
   Rustbucket salvage and the Chimneys; Cedar Hollow has Twin Falls, Fire Watch, Mud Season and the Old
-  Logging Road; both have free roam.
+  Logging Road; Highline Pass has the Hut Supply Run, Over the Top, Silver Rush and Weather Watch; all
+  three have free roam.
 - **Scrap**: earned by finishing expeditions and discovering landmarks; spent in the garage.
 - **Garage**: two bodies (Ridgeback short-wheelbase wagon, Packhorse long-wheelbase pickup), three tyre types with surface trade-offs (Trailhound A/T all-rounder, Gripjaw M/T rock and mud crawler that bogs in sand, Dunerunner sand floater that slides on rock and in mud), tyre grades, engine and suspension stages, accessories and paint.
 - **Spare wheel**: whatever tyre you mount on the back can be swapped on once per expedition. Choose it for the terrain you expect at the far end of the route.
@@ -52,11 +56,11 @@ Graphics presets: **Battery Saver** (30 FPS cap, runs cool), **Low**, **Medium**
 | Path | What |
 |---|---|
 | `blender/vehicles/` | The fleet: two bodies, three tyre types, accessories |
-| `blender/landmarks/` | Landmarks: arch, balanced rock, windmill outpost, wreck, camp, cairns; log cabin, fire lookout, timber bridge |
-| `blender/props/` | Scenery: desert rocks, scrub, yuccas; forest firs (with impostors), aspens, logs, granite boulders, ferns |
-| `blender/formations/` | Big landforms as signed distance fields: sandstone mounds/fins/spires/arch; granite domes/crags/falls |
+| `blender/landmarks/` | Landmarks: arch, balanced rock, windmill outpost, wreck, camp, cairns; log cabin, fire lookout, timber bridge; stone hut, mine, weather station |
+| `blender/props/` | Scenery: desert rocks, scrub, yuccas; forest firs (with impostors), aspens, logs, granite boulders, ferns; krummholz, tussocks, gneiss boulders, scree, snow poles |
+| `blender/formations/` | Big landforms as signed distance fields: sandstone mounds/fins/spires/arch; granite domes/crags/falls; alpine spires, crests, erratics |
 | `blender/preview/` | Quick Cycles renders for reviewing models |
-| `tools/terrain/` | Region generators (desert, forest): heightmap, tracks, rivers, hazards, masks, landmark sites, scenery |
+| `tools/terrain/` | Region generators (desert, forest, alpine): heightmap, tracks, rivers, hazards, masks, landmark sites, scenery |
 | `tools/art/` | Ground textures (CC0 scans re-coloured + procedural), foliage sprites, material textures |
 | `Assets/Art/Shaders/` | Terrain (hex-tiled, height-blended), rock, dirt-track decal, water, foliage, backdrop, tyre-trail shaders |
 | `Assets/UI/` | UI Toolkit stylesheet and fonts (Barlow, SIL Open Font License) |

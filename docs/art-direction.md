@@ -37,7 +37,7 @@ cost so a fanless MacBook Air holds 60 FPS on Medium.
    is pale, smooth and slowly breathing, ringed by damp sand and marked by a warning sign. Both come
    from one hazard map (`desert_hazard.png`: R mud, G quicksand, B washboard, A water) that the
    shaders and the vehicle physics read.
-10. **A living sky.** Procedural cumulus (Clouds.shader) drift over both regions, lit from the sun
+10. **A living sky.** Procedural cumulus (Clouds.shader) drift over every region, lit from the sun
     side with a silver lining near it and fading into the horizon haze; sparse over the canyon, fuller
     over the valley.
 11. **Cinematic light.** A low sun (golden hour: late afternoon over the canyon, seen against the light
@@ -109,6 +109,31 @@ over pale gravel bars, meadows with aspen groves, logging-era tracks with fords 
 | Granite domes, crags, tors, waterfall cliff | `blender/formations/granite_formations.py` |
 | Cabin, lookout, bridge, log piles | `blender/landmarks/forest_landmarks.py` |
 
+## Highline Pass (high alpine)
+
+Reference points: the Alps and the high Rockies in early summer: a glacier-carved valley with a milky
+turquoise tarn under a cirque wall, tundra and krummholz above the treeline, scree fans below every
+cliff, old snow lingering on north faces and in hollows, a pass road marked with snow poles.
+
+- **Composition.** The valley is a U-shape between saw-toothed crests (domain-warped ridged noise with
+  cliff bands); the eye runs up the stream to the tarn, then up the switchbacks to the saddle.
+- **Rock** is dark, cool gneiss (Rock030, darkened) with rusty cracks and lichen; above ~230 m snow lies
+  on every ledge, in the terrain shader and on the crags alike, so the snowline reads as one surface.
+- **Snow** is near-white with blue hollows and wind ripples, and sparkles in the sun close up. Tyres cut
+  deep ruts in it (12 cm, more in drifts), compacted and grey at the bottom.
+- **Hazards read at a glance**: drifts are clean white mounds across the track, sheet ice is glassy
+  blue-grey with white cracks, slush is dark and wet.
+- **Light**: crisp, whiter sun from the north-west, deep blue zenith, thin haze and long views; tall
+  snow-capped ranges behind the local peaks.
+
+| What | Generator |
+|---|---|
+| Region layout, stream, tarn, graded switchbacks, hazards, scatter | `tools/terrain/generate_alpine.py` |
+| Snow, scree, tundra, gneiss, track gravel | `tools/art/generate_alpine_textures.py` |
+| Krummholz, tussocks, cushion plants, boulders, scree, snow poles | `blender/props/alpine_props.py` |
+| Spires, crests, erratics | `blender/formations/alpine_formations.py` |
+| Stone hut, cairns, summit sign, mine, weather station | `blender/landmarks/alpine_landmarks.py` |
+
 ## Third-party sources
 
 Only used where they fit the palette and shapes exactly; everything else is made here.
@@ -118,6 +143,6 @@ Only used where they fit the palette and shapes exactly; everything else is made
 | Ground054 (sand scan) | [ambientCG](https://ambientcg.com/view?id=Ground054) | CC0 1.0 | Sand grain and surface relief, high-passed and re-coloured to our palette (`tools/art/sources/ambientcg/`) |
 | Ground037 (forest floor) | [ambientCG](https://ambientcg.com/view?id=Ground037) | CC0 1.0 | Forest floor and meadow |
 | Ground048 (forest soil) | [ambientCG](https://ambientcg.com/view?id=Ground048) | CC0 1.0 | Track soil and wet mud |
-| Rock030 (rock) | [ambientCG](https://ambientcg.com/view?id=Rock030) | CC0 1.0 | Granite, cooled |
-| Gravel021 (gravel) | [ambientCG](https://ambientcg.com/view?id=Gravel021) | CC0 1.0 | River gravel, lightened, silt added |
+| Rock030 (rock) | [ambientCG](https://ambientcg.com/view?id=Rock030) | CC0 1.0 | Granite, cooled; alpine gneiss, darkened; detail in the scree |
+| Gravel021 (gravel) | [ambientCG](https://ambientcg.com/view?id=Gravel021) | CC0 1.0 | River gravel, lightened, silt added; alpine track gravel |
 | Bark001 (bark) | [ambientCG](https://ambientcg.com/view?id=Bark001) | CC0 1.0 | Fir bark, re-coloured |
