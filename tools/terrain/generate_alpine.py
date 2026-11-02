@@ -236,7 +236,7 @@ edge = (0.5 * np.maximum(np.abs(xs - SIZE / 2), np.abs(zs - SIZE / 2)) + 0.5 * n
 exitgap = smoothstep(70, 170, np.hypot(xs - 570, zs + 20))
 h += 50 * smoothstep(0.84, 0.99, edge + 0.08 * (fbm(5, 3, SEED + 5) - 0.5)) * exitgap
 # Weather station knoll: a rounded shoulder on the east side of the valley.
-h += 18 * gauss(690, 430, 28)
+h += 10 * gauss(690, 430, 45)
 # Soft cap: summits compress instead of clipping.
 h = np.where(h > 430, 430 + (h - 430) * 0.55, h)
 

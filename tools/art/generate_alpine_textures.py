@@ -168,6 +168,7 @@ gr = gr * (1 + np.array([-0.12, 0.08, -0.14]) * (greenish[..., None] - 0.5) * 2)
 straw = np.clip((tile_noise(T, 3.0, 323) - 0.45) * 3, 0, 1)[..., None]
 gr = gr * (1 - 0.5 * straw) + lum(gr)[..., None] * np.array([1.25, 1.1, 0.7]) * 0.5 * straw
 stones = np.clip((tile_noise(T, 2.6, 322) - 0.66) * 6, 0, 1) * np.clip(scree_h * 3, 0, 1)
+gr = (lum(gr)[..., None] * 0.18 + gr * 0.82) * np.array([0.97, 1.02, 0.99])        # a touch less golden
 gr = gr * (1 - stones[..., None]) + scree_albedo * stones[..., None]
 gh = fh * 0.6 + scree_h * stones * 0.6
 save("AlpineGrass", gr, gh, normal_from_height(blur(gh, 0.7), 6.0) * 0.5 + gl_normal("Ground037_1K_NormalGL.jpg", 0.6) * 0.5)
