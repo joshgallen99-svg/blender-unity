@@ -528,84 +528,28 @@ namespace Offroad.EditorTools
         // ------------------------------------------------------------------ water
 
         /// <summary>
-        /// River ribbon (flowing downstream along uv.y), the plunge lake and the waterfall sheet, all with
-        /// the Water shader; mist at the foot of the falls. Vertex colour: r turbulence, g extra foam,
+        /// River and lake surfaces fitted to the terrain, and the waterfall sheet, all with the Water
+        /// shader; mist at the foot of the falls. Vertex colour: r turbulence, g extra foam,
         /// b waterfall, a flow-speed multiplier.
         /// </summary>
         static void CreateWater(Terrain terrain, RegionInfo info)
         {
             var root = new GameObject("Water").transform;
+            // Clear this region's old water meshes (the tiling changes when the terrain does).
+            if (AssetDatabase.IsValidFolder($"{GeneratedDir}/Water"))
+                foreach (var guid in AssetDatabase.FindAssets("t:Mesh", new[] { $"{GeneratedDir}/Water" }))
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (Path.GetFileName(path).StartsWith($"{Region}_")) AssetDatabase.DeleteAsset(path);
+                }
             var mat = MaterialLibrary.Water($"Water_{P.title}", P.waterShallow, P.waterDeep, P.waterClarity);
             float ty = terrain.transform.position.y;
             Vector3 fallsPos = info.falls != null ? new Vector3(info.falls.x, 0f, info.falls.z) : Vector3.zero;
 
-            // --- River, in chunks for culling.
-            var r = info.river;
-            if (r != null && r.x != null && r.x.Length > 2)
-            {
-                int n = r.x.Length;
-                const int Across = 7;
-                var dist = new float[n];
-                for (int i = 1; i < n; i++) dist[i] = dist[i - 1] + Vector2.Distance(new Vector2(r.x[i], r.z[i]), new Vector2(r.x[i - 1], r.z[i - 1]));
-                for (int start = 0, chunk = 0; start < n - 1; start += 150, chunk++)
-                {
-                    int end = Mathf.Min(start + 150, n - 1);
-                    var mb = new MeshBits();
-                    for (int i = start; i <= end; i++)
-                    {
-                        int ip = Mathf.Max(i - 1, 0), inx = Mathf.Min(i + 1, n - 1);
-                        var dir = new Vector3(r.x[inx] - r.x[ip], 0f, r.z[inx] - r.z[ip]).normalized;
-                        var right = new Vector3(dir.z, 0f, -dir.x);
-                        float reach = r.halfWidth[i] + 5f;
-                        // Rapids where the river is narrow or drops fast.
-                        int i2 = Mathf.Min(i + 4, n - 1), i0 = Mathf.Max(i - 4, 0);
-                        float drop = (r.level[i0] - r.level[i2]) / Mathf.Max(dist[i2] - dist[i0], 1f);
-                        float turb = Mathf.Clamp01((10f - r.halfWidth[i]) / 6f * 0.6f + drop * 25f);
-                        float foam = info.falls != null && info.falls.top > 0f ? Mathf.Clamp01(1f - dist[i] / 45f) : 0f;   // churned water below the falls
-                        for (int s = 0; s < Across; s++)
-                        {
-                            float lat = Mathf.Lerp(-reach, reach, s / (Across - 1f));
-                            var q = new Vector3(r.x[i], r.level[i] + ty, r.z[i]) + right * lat;
-                            mb.Add(q, Vector3.up, new Vector4(right.x, 0f, right.z, 1f), new Vector2(lat, dist[i]), new Color(turb, foam, 0f, 1f));
-                        }
-                        if (i > start) mb.Strip(i - start - 1, Across);
-                    }
-                    Place(root, mb.Build($"River_{chunk}"), mat);
-                }
-            }
-
-            // --- Lake: an ellipse a little larger than its bed, so it meets the shore slopes.
+            // --- River and lake: one continuous surface fitted to the terrain (see WaterSurfaceBuilder).
+            foreach (var mesh in WaterSurfaceBuilder.Build(terrain, info.river, info.lake, info.falls))
+                Place(root, mesh, mat);
             var l = info.lake;
-            if (l != null && l.rx > 0f)
-            {
-                var mb = new MeshBits();
-                const int Seg = 48, Rings = 5;
-                var rot = Quaternion.Euler(0f, -l.yaw, 0f);
-                for (int ring = 0; ring <= Rings; ring++)
-                {
-                    float t = ring / (float)Rings;
-                    for (int k = 0; k < Seg; k++)
-                    {
-                        float a = k * Mathf.PI * 2f / Seg;
-                        var off = rot * new Vector3(Mathf.Cos(a) * (l.rx + 8f) * t, 0f, Mathf.Sin(a) * (l.rz + 8f) * t);
-                        var q = new Vector3(l.x, l.level + ty, l.z) + off;
-                        // A churning foam ring where the falls hit the lake, spreading out and thinning.
-                        float dFalls = info.falls != null ? Vector2.Distance(new Vector2(q.x, q.z), new Vector2(fallsPos.x, fallsPos.z - 4f)) : 999f;
-                        float foam = Mathf.Clamp01(1.25f - dFalls / 24f);
-                        float churn = Mathf.Clamp01(1f - dFalls / 30f);
-                        mb.Add(q, Vector3.up, new Vector4(1f, 0f, 0f, 1f), new Vector2(q.x, q.z),
-                               new Color(0.15f + 0.85f * churn, foam, 0f, 0.08f + 0.5f * churn));
-                    }
-                }
-                for (int ring = 0; ring < Rings; ring++)
-                for (int k = 0; k < Seg; k++)
-                {
-                    int a0 = ring * Seg + k, a1 = ring * Seg + (k + 1) % Seg, b0 = a0 + Seg, b1 = a1 + Seg;
-                    mb.Tri(a0, b0, b1);
-                    mb.Tri(a0, b1, a1);
-                }
-                Place(root, mb.Build("Lake"), mat);
-            }
 
             // --- Waterfall: a curved sheet pouring from the cliff notch into the lake, plus mist.
             if (info.falls != null && info.falls.top > 0f && l != null)

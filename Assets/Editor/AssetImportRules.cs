@@ -27,6 +27,23 @@ namespace Offroad.EditorTools
             mi.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
         }
 
+        /// <summary>
+        /// Rock shaders read baked occlusion / cavity / edge data from vertex colours (white = no effect).
+        /// Meshes without colours get white, so every shader sees a defined value on every GPU.
+        /// </summary>
+        void OnPostprocessModel(GameObject root)
+        {
+            if (!assetPath.StartsWith("Assets/Models/")) return;
+            foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mesh = mf.sharedMesh;
+                if (mesh == null || mesh.colors32.Length == mesh.vertexCount) continue;
+                var white = new Color32[mesh.vertexCount];
+                for (int i = 0; i < white.Length; i++) white[i] = new Color32(255, 255, 255, 255);
+                mesh.colors32 = white;
+            }
+        }
+
         void OnPreprocessTexture()
         {
             var ti = (TextureImporter)assetImporter;

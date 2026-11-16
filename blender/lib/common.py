@@ -294,6 +294,7 @@ def export_fbx(objs, path):
         bake_space_transform=True,
         use_mesh_modifiers=True,
         mesh_smooth_type="OFF",
+        colors_type="LINEAR",       # baked vertex data (rock occlusion) must reach Unity unchanged
         add_leaf_bones=False,
         bake_anim=False,
     )

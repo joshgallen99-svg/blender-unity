@@ -133,7 +133,65 @@ def finish_sdf(g, sd, seed, ledge_period=2.6, ledge_depth=0.45, tilt=(0.06, 0.02
     return sd
 
 
+def bake_surface_data(obj, g, sd):
+    """Bake occlusion and wear from the full-resolution distance field into vertex colours, so the
+    decimated in-game mesh keeps the shading of the detailed sculpt (Unity reads COLOR):
+      R  ambient occlusion: how enclosed each point is, sampled out to ~6 m (overhangs, alcoves, joints)
+      G  1 - cavity: small-scale crevices and pits within ~0.8 m (dirt, moss, lichen collect here)
+      B  1 - edge: convex ridges and corners (weathered paler, catch the light)
+    Stored inverted so that white, what a mesh without baked data gets, means "no effect".
+    The field is sampled along each vertex normal (the classic distance-field occlusion trick)."""
+    mesh = obj.data
+    n = len(mesh.vertices)
+    if n == 0:
+        return
+    co = np.empty(n * 3)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(n, 3)
+    nr = np.empty(n * 3)
+    mesh.vertices.foreach_get("normal", nr)
+    nr = nr.reshape(n, 3)
+    nr /= np.maximum(np.linalg.norm(nr, axis=1, keepdims=True), 1e-6)
+
+    def sample(pts):
+        idx = ((pts - g.origin) / g.voxel).T
+        return ndimage.map_coordinates(sd, idx, order=1, mode="nearest")
+
+    def occlusion(dists):
+        occ, wsum = 0.0, 0.0
+        for k, h in enumerate(dists):
+            w = 0.75 ** k
+            occ = occ + w * np.clip((h - sample(co + nr * h)) / h, 0, 1)
+            wsum += w
+        return occ / wsum
+
+    # The weathering noise bends the field (gradient ~0.5-1.3, not exactly 1), so a flat open face
+    # already reads a little occluded: subtract that baseline before scaling.
+    ao = 1.0 - np.clip((occlusion((0.8, 1.6, 3.0, 4.5, 6.5)) - 0.1) * 1.3, 0, 0.85)
+    cavity = np.clip((occlusion((0.25, 0.5, 0.8)) - 0.18) * 2.2, 0, 1)
+    edge = np.clip(((sample(co - nr * 0.45) + 0.45) / 0.45 - 0.2) * 1.5, 0, 1)
+
+    # One smoothing pass over mesh neighbours keeps the bake free of per-vertex speckle.
+    e = np.empty(len(mesh.edges) * 2, dtype=np.int64)
+    mesh.edges.foreach_get("vertices", e)
+    e = e.reshape(-1, 2)
+    data = np.c_[ao, 1.0 - cavity, 1.0 - edge]
+    acc = data.copy()
+    cnt = np.ones(n)
+    np.add.at(acc, e[:, 0], data[e[:, 1]])
+    np.add.at(acc, e[:, 1], data[e[:, 0]])
+    np.add.at(cnt, e[:, 0], 1)
+    np.add.at(cnt, e[:, 1], 1)
+    data = 0.5 * data + 0.5 * acc / cnt[:, None]
+
+    attr = mesh.color_attributes.get("Col") or mesh.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+    rgba = np.c_[data, np.ones(n)].astype(np.float32)
+    attr.data.foreach_set("color", rgba.ravel())
+    mesh.color_attributes.active_color = attr
+
+
 def mesh_from_sdf(name, g, sd, mat, target_tris):
+    field = sd
     sd = np.pad(sd, 1, constant_values=sd.max())        # close the surface at the volume edges
     verts, faces, _, _ = measure.marching_cubes(sd, level=0.0, spacing=(g.voxel,) * 3)
     verts = verts - g.voxel + g.origin
@@ -166,6 +224,7 @@ def mesh_from_sdf(name, g, sd, mat, target_tris):
         C.apply_modifiers(obj)
     for p in obj.data.polygons:
         p.use_smooth = True
+    bake_surface_data(obj, g, field)
     return obj
 
 

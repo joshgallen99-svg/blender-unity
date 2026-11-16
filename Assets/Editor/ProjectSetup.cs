@@ -129,11 +129,15 @@ namespace Offroad.EditorTools
             a.shadowCascadeCount = 2;
             a.useSRPBatcher = true;
             a.supportsCameraDepthTexture = false;
-            a.supportsCameraOpaqueTexture = false;
+            // The water refracts the riverbed from the opaque texture (a half-resolution copy: cheap).
+            a.supportsCameraOpaqueTexture = true;
             // Sun only: no additional lights means fewer shader variants and cheaper lighting.
             var so = new SerializedObject(a);
+            var down = so.FindProperty("m_OpaqueDownsampling");
+            if (down != null) down.intValue = (int)Downsampling._2xBilinear;
             var addl = so.FindProperty("m_AdditionalLightsRenderingMode");
-            if (addl != null) { addl.intValue = (int)LightRenderingMode.Disabled; so.ApplyModifiedPropertiesWithoutUndo(); }
+            if (addl != null) addl.intValue = (int)LightRenderingMode.Disabled;
+            so.ApplyModifiedPropertiesWithoutUndo();
             a.upscalingFilter = UpscalingFilterSelection.FSR;
             a.colorGradingMode = ColorGradingMode.LowDynamicRange;
             EditorUtility.SetDirty(a);

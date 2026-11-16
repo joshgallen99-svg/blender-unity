@@ -19,6 +19,7 @@ Shader "Offroad/ForestRock"
         _SkirtHeight ("Sand Skirt Height (m)", Float) = 1.2
         _BumpScale ("Normal Strength", Range(0, 2)) = 1
         _Smoothness ("Smoothness", Range(0, 1)) = 0.1
+        _Baked ("Baked Occlusion / Crevices", Range(0, 1)) = 1
         _SnowHeight ("Snow on Ledges Start/Full (world Y)", Vector) = (100000, 100001, 0, 0)
         _SnowAmount ("Snow on Ledges", Range(0, 1)) = 0.6
     }
@@ -42,6 +43,7 @@ Shader "Offroad/ForestRock"
             float _SkirtHeight;
             half _BumpScale;
             half _Smoothness;
+            half _Baked;
             float4 _SnowHeight;
             half _SnowAmount;
         CBUFFER_END
@@ -74,6 +76,7 @@ Shader "Offroad/ForestRock"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                half4 color : COLOR;            // baked in Blender: R occlusion, G 1-cavity, B 1-edge
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -83,6 +86,7 @@ Shader "Offroad/ForestRock"
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS : TEXCOORD1;
                 float4 originFog : TEXCOORD2;   // xyz object origin in world, w fog factor
+                half4 baked : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -97,6 +101,7 @@ Shader "Offroad/ForestRock"
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.originFog.xyz = TransformObjectToWorld(float3(0, 0, 0));
                 o.originFog.w = ComputeFogFactor(pos.positionCS.z);
+                o.baked = v.color;
                 return o;
             }
 
@@ -121,6 +126,15 @@ Shader "Offroad/ForestRock"
                 rock = lerp(rock, rock * half3(0.92, 1.0, 0.86) + half3(0.06, 0.07, 0.04), lichen * 0.55);
                 rock *= lerp(0.82, 1.08, macro.r);
 
+                // Baked from the full-detail sculpt: crevices fill with dark grime, ridges weather paler,
+                // and enclosed areas (overhangs, joints, alcoves) lose sky light.
+                half bakedAO = lerp(1.0, i.baked.r, _Baked);
+                half cavity = (1.0 - i.baked.g) * _Baked;
+                half edge = (1.0 - i.baked.b) * _Baked;
+                rock = lerp(rock, rock * half3(0.16, 0.19, 0.11) * 2.2, cavity * 0.55);
+                rock *= 1.0 + edge * 0.14;
+                rock *= lerp(1.0, bakedAO, 0.4);
+
                 // Sand: on upward-facing ledges, and as a skirt where the rock meets the terrain.
                 float2 uvTop = p.xz / _TopScale;
                 half4 sandTex = SAMPLE_TEXTURE2D(_TopMap, sampler_TopMap, uvTop);
@@ -136,6 +150,7 @@ Shader "Offroad/ForestRock"
 
                 // Contact darkening just above the sand line.
                 half occlusion = lerp(0.62, 1.0, saturate((above - 0.1) / 2.5));
+                occlusion *= bakedAO;
 
                 // High up: snow lies on the ledges and upward faces (alpine rock only; off by default).
                 half snowH = smoothstep(_SnowHeight.x, _SnowHeight.y, p.y + (macro2.r - 0.5) * 40.0);

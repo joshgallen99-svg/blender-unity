@@ -19,6 +19,7 @@ Shader "Offroad/RockTriplanar"
         _SkirtHeight ("Sand Skirt Height (m)", Float) = 1.2
         _BumpScale ("Normal Strength", Range(0, 2)) = 1
         _Smoothness ("Smoothness", Range(0, 1)) = 0.1
+        _Baked ("Baked Occlusion / Crevices", Range(0, 1)) = 1
     }
 
     SubShader
@@ -40,6 +41,7 @@ Shader "Offroad/RockTriplanar"
             float _SkirtHeight;
             half _BumpScale;
             half _Smoothness;
+            half _Baked;
         CBUFFER_END
 
         TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -70,6 +72,7 @@ Shader "Offroad/RockTriplanar"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                half4 color : COLOR;            // baked in Blender: R occlusion, G 1-cavity, B 1-edge
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -79,6 +82,7 @@ Shader "Offroad/RockTriplanar"
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS : TEXCOORD1;
                 float4 originFog : TEXCOORD2;   // xyz object origin in world, w fog factor
+                half4 baked : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -93,6 +97,7 @@ Shader "Offroad/RockTriplanar"
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.originFog.xyz = TransformObjectToWorld(float3(0, 0, 0));
                 o.originFog.w = ComputeFogFactor(pos.positionCS.z);
+                o.baked = v.color;
                 return o;
             }
 
@@ -116,6 +121,15 @@ Shader "Offroad/RockTriplanar"
                 half3 rock = rockTex.rgb * strata * 1.55 * _BaseColor.rgb;
                 rock *= lerp(0.84, 1.1, macro.r);
 
+                // Baked from the full-detail sculpt: crevices fill with dark grime, ridges weather paler,
+                // and enclosed areas (overhangs, joints, alcoves) lose sky light.
+                half bakedAO = lerp(1.0, i.baked.r, _Baked);
+                half cavity = (1.0 - i.baked.g) * _Baked;
+                half edge = (1.0 - i.baked.b) * _Baked;
+                rock = lerp(rock, rock * half3(0.22, 0.12, 0.07) * 2.2, cavity * 0.55);
+                rock *= 1.0 + edge * 0.14;
+                rock *= lerp(1.0, bakedAO, 0.4);
+
                 // Sand: on upward-facing ledges, and as a skirt where the rock meets the terrain.
                 float2 uvTop = p.xz / _TopScale;
                 half4 sandTex = SAMPLE_TEXTURE2D(_TopMap, sampler_TopMap, uvTop);
@@ -131,6 +145,7 @@ Shader "Offroad/RockTriplanar"
 
                 // Contact darkening just above the sand line.
                 half occlusion = lerp(0.62, 1.0, saturate((above - 0.1) / 2.5));
+                occlusion *= bakedAO;
 
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = lerp(rock, sand, sandW);
